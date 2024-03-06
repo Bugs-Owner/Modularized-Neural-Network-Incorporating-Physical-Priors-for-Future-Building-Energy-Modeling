@@ -12,6 +12,12 @@ We also have a public web app available: https://resitool.streamlit.app/ Which i
 Section 1. Load prediction
 
 Section 2. Dynamic modeling (Start from the most exciting part first! Rest coming soon, daily update!!)
+For dynamic modeling, the model can be split into three major parts:
+1) Dataset
+
+3) Model
+
+5) Train
 
 Section 3. Energy Optimization
 
