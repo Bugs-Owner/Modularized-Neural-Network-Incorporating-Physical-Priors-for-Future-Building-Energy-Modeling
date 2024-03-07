@@ -27,17 +27,17 @@ ddp.data_ready(num_zone=1,
                mode=modes)
 par.paradic["mode"]=modes
 par.paradic["lr"],par.paradic["epochs"] = 0.001, 300
-#ddp.train(para=par.paradic)
+ddp.train(para=par.paradic)
 #Test on different task
-# ddp.load(para=par.paradic)
-# ddp.test()
-# ddp.plot(feature='phvac')
+ddp.load(para=par.paradic)
+ddp.test()
+ddp.plot(feature='phvac')
 # ddp.csv_save(feature='phvac')
 #Test on Ehvac task
-par.paradic["lr"],par.paradic["epochs"] = 0.001, 200
-ddp.transfer(para=par.paradic)
+# par.paradic["lr"],par.paradic["epochs"] = 0.001, 200
+# ddp.transfer(para=par.paradic)
 # ddp.Retrain(feature='Etotal')
-ddp.reload(para=par.paradic, feature='Ecool')
+# ddp.reload(para=par.paradic, feature='Ecool')
 #ddp.plot(feature='Etotal')
 #ddp.csv_save(feature='Ecool')
 

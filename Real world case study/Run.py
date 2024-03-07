@@ -6,7 +6,7 @@ for trainday in [30]:
     for enco in [4]:
         for deco in [96]:
             ddp = ddpred()
-            ddp.data_ready(path="../381_CaseStudy/Data/traindata.csv",
+            ddp.data_ready(path="/home/zjiang19/Documents/GitHub/Physical-Incorporated-Neural-Network-BEM/Dataset/Real-world-dataset/traindata.csv",
                            enLen=enco,
                            deLen=deco,
                            startday=0,
@@ -42,6 +42,6 @@ for trainday in [30]:
             ddp.prediction_show()
             ddp.check()
             ddp.check_show(check='HVAC')
-            ddp.show()
+
 
 

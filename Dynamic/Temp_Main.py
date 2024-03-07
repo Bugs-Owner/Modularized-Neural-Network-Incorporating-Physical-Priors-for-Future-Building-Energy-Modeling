@@ -6,8 +6,6 @@ import os
 for trainday in [30]:
     print(trainday)
     ddp = ddpred()
-    #r"/home/zjiang19/Documents/GitHub/Dynamic/DynamicPrediction/Temperature_SInglezone/EnergyPlus/EP_Training_Data/Single/Train_0_Denver_current_TMY_Cooling.csv"
-    #r"/home/zjiang19/Documents/GitHub/Dynamic/Load_Prediction/EnergyPlus/EP_Training_Data/Single/Train_0_Denver_long_TMY_Cooling.csv"
     path=r"/home/zjiang19/Documents/GitHub/Dynamic/DynamicPrediction/Temperature_SInglezone/EnergyPlus/EP_Training_Data/Single/Train_0_Denver_current_TMY_Cooling.csv"
     ddp.data_ready(path=path,
                    enLen=8,
@@ -39,12 +37,12 @@ for trainday in [30]:
         return para
 
     para=paramethers()
-    para["lr"], para["epochs"]= 0.001, 250
-    #ddp.Singletrain(para)
+    para["lr"], para["epochs"]= 0.001, 200
+    ddp.Singletrain(para)
     ddp.Singleload(para)
     ddp.Singletest()
     ddp.Single_Temp_show()
-    #ddp.Single_save()
+    ddp.Single_save()
 
     # folder_path = "PretrainedClass"
     # if not os.path.exists(folder_path):

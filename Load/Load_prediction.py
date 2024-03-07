@@ -36,10 +36,12 @@ class ddpred:
         self.city = city
         self.timespan = timespan
         print('Preparing data')
+        dataset_folder_path = '/home/zjiang19/Documents/GitHub/Physical-Incorporated-Neural-Network-BEM/Dataset/Energyplus/single/For load training'
         if num_zone == 1:
             print("Single Zone Task")
-            self.datapath = ("../EnergyPlus/EP_Training_Data/Single"+
-                             '/Train_{}_{}_{}_{}_{}.csv'.format(delta, city, timespan, wea, mode))
+            filename = 'Train_{}_{}_{}_{}_{}.csv'.format(delta, city, timespan, wea, mode)
+            self.datapath = os.path.join(dataset_folder_path, filename)
+
             self.mdl = "Single"
         else:
             print("Multi Zone Task")

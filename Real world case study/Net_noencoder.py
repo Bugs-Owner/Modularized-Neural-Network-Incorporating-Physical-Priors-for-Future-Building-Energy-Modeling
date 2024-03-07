@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from tqdm import trange
-from Solver import NNsolver
+
 
 class gru_Linear(nn.Module):
 
