@@ -12,16 +12,17 @@ We also have a public web app available: https://resitool.streamlit.app/ Which i
 Section 1. Load prediction
 
 Section 2. Dynamic modeling (Start from the most exciting part first! Rest coming soon, daily update!!)
-For dynamic modeling, the model can be split into three major parts:
-1) Dataset
-   
-   Outdoor air temperature, solar radiation, HVAC are required features
-   Space air temperature is required target
-   
-3) Model
 
-4) Train
+Step 1: Run "Temp_main.py"
+trainday: training datasize
+enLen: encoder length, large building need longer time to initialize
+delen: decoder length, the forecasting horizon, it depends on your MPC prediction horizon. For flexibility case, the price signal is always day-ahead, so we chose 96(1 day) here
+resolution: the commonly used resolution in the building field is 5 minutes / 15 minutes / 30 minutes and 60 minutes
 
+
+
+
+   
 Section 3. Energy Optimization
 
 Section 4. Retrofit
