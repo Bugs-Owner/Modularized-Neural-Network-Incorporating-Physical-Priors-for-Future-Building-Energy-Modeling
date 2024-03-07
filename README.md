@@ -14,12 +14,13 @@ Section 1. Load prediction
 Section 2. Dynamic modeling (Start from the most exciting part first! Rest coming soon, daily update!!)
 For dynamic modeling, the model can be split into three major parts:
 1) Dataset
+   
    Outdoor air temperature, solar radiation, HVAC are required features
    Space air temperature is required target
    
-2) Model
+3) Model
 
-3) Train
+4) Train
 
 Section 3. Energy Optimization
 
