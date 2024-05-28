@@ -9,7 +9,7 @@ import torch
 import matplotlib.dates as dates
 import matplotlib.pyplot as plt
 from Models import SeqPINN
-from Play import train_model, test_model
+from Play import train_model, test_model, check_model
 import matplotlib
 from matplotlib.ticker import MaxNLocator
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -32,6 +32,7 @@ class ddpred:
         para = paras(args=args)
         self.dataset = DC
         self.para = para
+        self.args = args
         print("--- %s seconds ---" % (time.time() - start_time))
 
     def train(self):
@@ -159,6 +160,24 @@ class ddpred:
             pickle.dump(mape, f)
         print("--- %s seconds ---" % (time.time() - start_time))
 
+    def check(self):
+        print('Checking start')
+        start_time = time.time()
+        outputs_max, outputs_min, outputs_ = check_model(model=self.model,
+                                                         test_loader=self.dataset.TestLoader[0],
+                                                         check_terms=self.args.check_terms,
+                                                         enco=self.dataset.enLen)
+        outputs_max_denorm, outputs_min_denorm, outputs_denorm = [], [], []
+        tempscal = self.dataset.processed_data[0]['TzoneScaler']
+        for idx in range(outputs_max.shape[0]):
+            outputs_max_denorm.append(tempscal.inverse_transform(outputs_max[[idx], self.para['encoLen']:, :].reshape(-1, 1)))
+            outputs_min_denorm.append(tempscal.inverse_transform(outputs_min[[idx], self.para['encoLen']:, :].reshape(-1, 1)))
+            outputs_denorm.append(tempscal.inverse_transform(outputs_[[idx], self.para['encoLen']:, :].reshape(-1, 1)))
+        self.outputs_max_denorm = outputs_max_denorm
+        self.outputs_min_denorm = outputs_min_denorm
+        self.outputs_denorm = outputs_denorm
+        print("--- %s seconds ---" % (time.time() - start_time))
+
     def prediction_show(self):
         print('Ploting start')
         rawdf = self.dataset.test_raw_df
@@ -190,3 +209,51 @@ class ddpred:
         ax.margins(x=0)
         ax.legend(loc='center', bbox_to_anchor=(0.5, 1.05), ncol=2, fontsize=16, frameon=False)
         plt.show()
+
+    def check_show(self):
+        print('Ploting start')
+        rawdf = self.dataset.test_raw_df
+        test_len = len(self.de_out)
+        pred_len = self.dataset.deLen
+        fig, ax = plt.subplots(1, 1, figsize=(2.2, 1.2), dpi=300, sharex='col', sharey='row', constrained_layout=True)
+        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_zone_{}'.format(0)].values[:test_len] - 32) * 5 / 9, '-',
+                     linewidth=1, color="#159A9C", label='Measurement')
+
+        for timestep in range(test_len):
+            tem = self.outputs_denorm[timestep][:test_len - timestep]
+            tem = (tem - 32) * 5 / 9
+            ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
+                         tem, '--', linewidth=0.4, alpha=0.5, color="gray")
+        for timestep in [32]:
+            minn = self.outputs_min_denorm[timestep][:test_len - timestep]
+            minn = (minn - 32) * 5 / 9
+            ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], minn, '--', linewidth=1, color="#8163FD")
+            maxx = self.outputs_max_denorm[timestep][:test_len - timestep]
+            maxx = (maxx - 32) * 5 / 9
+            ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], maxx, '--', linewidth=1, color="#FF5F5D")
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.outputs_denorm[0][0]) - 32) * 5 / 9, '--', linewidth=1, alpha=0.5, color="gray",
+                     label='Prediction')
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.outputs_min_denorm[0][0]) - 32) * 5 / 9, '--',
+                     linewidth=1, color="#8163FD", label='Max {}'.format(self.args.check_terms))
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.outputs_max_denorm[0][0]) - 32) * 5 / 9, '--',
+                     linewidth=1, color="#FF5F5D", label='Min {}'.format(self.args.check_terms))
+        mae = np.array(list(self.mae.values())).mean()
+        mape = np.array(list(self.mape.values())).mean()
+        ax.text(0.01, 0.75, 'MAE:{:.1f}[°C]\nMAPE:{:.1f}[%]'.format(mae, mape), fontsize=6, color='gray',
+                fontweight='bold', transform=ax.transAxes)
+        ax.legend(loc='center', bbox_to_anchor=(0.5, 1.18), ncol=2, fontsize=6, frameon=False)
+        ax.tick_params(axis='both', which='minor', labelsize=7)
+        ax.tick_params(axis='both', which='major', labelsize=7)
+        ax.xaxis.set_minor_locator(dates.HourLocator(interval=6))
+        ax.xaxis.set_minor_formatter(dates.DateFormatter('%H:%M'))
+        ax.xaxis.set_major_locator(dates.DayLocator(interval=1))
+        ax.xaxis.set_major_formatter(dates.DateFormatter('%b%d'))
+        ax.set_xlabel(None)
+        ax.set_ylabel('Temperature[°C]', fontsize=7)
+        ax.set_yticks(np.arange(18, 32, 2))
+        ax.set_ylim(18, 32)
+        ax.margins(x=0)
+        plt.show()
+
+
+

@@ -115,3 +115,24 @@ def test_model(model, test_loader):
             data, target = data.to(device), target.to(device)
             outputs = model(data)
     return outputs.cpu()
+
+def check_model(model, test_loader, check_terms, enco):
+    model.eval()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    with torch.no_grad():  # No gradients needed
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            data_max_check, data_min_check = data.clone(), data.clone()
+            if check_terms == 'HVAC':
+                data_max_check[:, enco:, [7]] =  0  # min cooling
+                data_min_check[:, enco:, [7]] = -1  # max cooling
+            if check_terms == 'Temp':
+                data_max_check[:, enco:, [1]] =  1
+                data_min_check[:, enco:, [1]] =  0
+            if check_terms == 'Solar':
+                data_max_check[:, enco:, [2]] =  1
+                data_min_check[:, enco:, [2]] =  0
+            outputs_max_check = model(data_max_check)
+            outputs_min_check = model(data_min_check)
+            outputs_no_check = model(data)
+    return outputs_max_check.cpu(), outputs_min_check.cpu(), outputs_no_check.cpu()

@@ -3,7 +3,7 @@ import argparse
 
 def run():
     parser = argparse.ArgumentParser(description = 'SeqPINN')
-    parser.add_argument('--mode', type=str, choices=['train', 'load'], default='load',
+    parser.add_argument('--mode', type=str, choices=['train', 'load', 'check'], default='check',
                         help='Mode to run the script: train or load')
     parser.add_argument('--lr', type = float, default = 0.001,
                        help = 'learning rate')
@@ -25,6 +25,8 @@ def run():
                        help='training start day')
     parser.add_argument('--testday', type = int, default = 1,
                        help='testing data size')
+    parser.add_argument('--check_terms', type=str, default='HVAC',
+                        help='checking objective')
     parser.add_argument('--path', type = str, default = '../Dataset/Link.csv',
                        help='training data path')
 
@@ -39,7 +41,13 @@ def run():
     elif args.mode == 'load':
         ddp.load()
         ddp.test()
-    ddp.prediction_show()
+        ddp.prediction_show()
+    elif args.mode == 'check':
+        ddp.load()
+        ddp.test()
+        ddp.check()
+        ddp.check_show()
+
 
 if __name__ == "__main__":
     run()
