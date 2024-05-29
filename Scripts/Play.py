@@ -73,10 +73,10 @@ def train_model(model, train_loader, valid_loader, lr, epochs, patience):
                 #     p.data.clamp_(0)
                 # for p in model.encoder_out.parameters():
                 #     p.data.clamp_(0)
-                # for p in model.encoder_hvac.parameters():
-                #     p.data.clamp_(0)
-                # for p in model.decoder_hvac.parameters():
-                #     p.data.clamp_(0)
+                for p in model.encoder_hvac.parameters():
+                    p.data.clamp_(0)
+                for p in model.decoder_hvac.parameters():
+                    p.data.clamp_(0)
 
                 train_loss += loss.item() * data.size(0)
 
