@@ -2,7 +2,9 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, Dataset, random_split
 import pandas as pd
 import numpy as np
+import os
 import torch
+import joblib
 
 
 class MyData(Dataset):
@@ -60,7 +62,7 @@ class DataCook:
 
         return normalized_adj_matrix
 
-    def data_preprocess(self, datapath, num_zone):
+    def data_preprocess(self, datapath, num_zone, args):
         self.df = pd.read_csv(datapath, index_col=[0])
         try:
             try:
@@ -70,13 +72,22 @@ class DataCook:
         except:
             print("Error, please change your time format to '%m/%d/%Y %H:%M' or '%Y-%m-%d %H:%M:%S'")
         self.num_zone = num_zone
-
         # Split data into zones
         processed_data = {}
         for zone in range(num_zone):
             # Data
             Tout = self.df['temp_outdoor'].to_numpy().reshape(-1, 1)
+
             Solar = self.df['solar'].to_numpy().reshape(-1, 1)
+            if 'day_sin' in self.df.columns:
+                0
+            else:
+                self.df["Time"] = self.df.index
+                h = self.df["Time"].dt.hour
+                m = self.df["Time"].dt.minute
+                ti = h + m / 60
+                self.df["day_sin"] = np.sin(ti * (2. * np.pi / 24))
+                self.df["day_cos"] = np.cos(ti * (2. * np.pi / 24))
             Day_sin = self.df['day_sin'].to_numpy().reshape(-1, 1)
             Day_cos = self.df['day_cos'].to_numpy().reshape(-1, 1)
             Occ = self.df['occ_{}'.format(zone)].to_numpy().reshape(-1, 1)
@@ -94,20 +105,24 @@ class DataCook:
             lower[6 * 4:18 * 4] = 70
             weight = np.ones(96) * 1
             weight[6 * 4:18 * 4] = 2
-            price = np.ones(96) * 10
-            price[15 * 4: 18 * 4] = 50
+            price = np.ones(96) * 1
+            price[15 * 4: 18 * 4] = 5
             daylen = int(Tzone.shape[0] / 96)
             upper = np.tile(upper, daylen).reshape(-1, 1)
             lower = np.tile(lower, daylen).reshape(-1, 1)
             weight = np.tile(weight, daylen).reshape(-1, 1)
             price = np.tile(price, daylen).reshape(-1, 1)
             # Scaler
-            ToutScaler = MinMaxScaler(feature_range=(0, 1))
-            SolarScaler = MinMaxScaler(feature_range=(0, 1))
-            OccScaler = MinMaxScaler(feature_range=(0, 1))
-            TzoneScaler = MinMaxScaler(feature_range=(0, 1))
-            PhvacScaler = MinMaxScaler(feature_range=(-1, 0))
-            TsetScaler = MinMaxScaler(feature_range=(0, 1))
+            ToutScaler = MinMaxScaler(feature_range=(-1, 1))
+            SolarScaler = MinMaxScaler(feature_range=(-1, 1))
+            OccScaler = MinMaxScaler(feature_range=(-1, 1))
+            TzoneScaler = MinMaxScaler(feature_range=(-1, 1))
+
+            if np.all(Phvac<0):
+                PhvacScaler = MinMaxScaler(feature_range=(-1*args.scale, 0))
+            else:
+                PhvacScaler = MinMaxScaler(feature_range=(-1*args.scale, 0))
+            TsetScaler = MinMaxScaler(feature_range=(-1, 1))
 
             # Normalization
             Toutscaled = ToutScaler.fit_transform(Tout).reshape(-1, 1)
@@ -118,6 +133,7 @@ class DataCook:
             Tsetscaled = TsetScaler.fit_transform(Tset).reshape(-1, 1)
             upperscaled = TzoneScaler.transform(upper).reshape(-1, 1)
             lowerscaled = TzoneScaler.transform(lower).reshape(-1, 1)
+
             # Summary
             Summary = np.concatenate((Tzonescaled, Toutscaled, Solarscaled, Day_sin, Day_cos, Occscaled,
                                       Tsetscaled, Phvacscaled, upperscaled, lowerscaled, weight, price), axis=1)
@@ -132,6 +148,10 @@ class DataCook:
             space['Tzonescaled'], space['Tsetscaled'], space['Phvacscaled'] = Tzonescaled, Tsetscaled, Phvacscaled
             space['Summary'] = Summary
             processed_data[zone] = space
+
+            saved_scalers = {'ToutScaler': ToutScaler, 'SolarScaler': SolarScaler, 'OccScaler': OccScaler,
+                             'TzoneScaler': TzoneScaler, 'TsetScaler': TsetScaler, 'PhvacScaler': PhvacScaler}
+            joblib.dump(saved_scalers, '../Checkpoint/saved_scalers.pkl')
 
         self.processed_data = processed_data
 
@@ -198,3 +218,90 @@ class DataCook:
         self.TrainLoader = TrainLoader
         self.ValidLoader = ValidLoader
         self.TestLoader = TestLoader
+
+    def eplus_data_manager(self, args):
+        # Historical data
+        folder = '../Dataset/Eplus_Generator/Eplus_realtime/{}_{}_{}_{}'.format(args.Eplusmdl, args.city, args.term, args.sce)
+        csv_name = '{}_{}_{}.csv'.format(args.controllertype, args.Begin_Month, args.Begin_Day_of_Month)
+        read_csv = os.path.join(folder, csv_name)
+        Historical = pd.read_csv(read_csv)[96*2:] #It also includes current measurement
+        # Future Data
+        folder = '../Dataset/Eplus_Generator/Eplus_train/{}_{}_{}_{}'.format(args.Eplusmdl, args.city, args.term, args.sce)
+        csv_name = '{}_{}_{}.csv'.format(args.controllertype, args.Begin_Month, args.Begin_Day_of_Month)
+        read_csv = os.path.join(folder, csv_name)
+        future = pd.read_csv(read_csv)
+        # Scalers
+        saved_scalers = joblib.load('../Checkpoint/saved_scalers.pkl')
+        #
+        import warnings
+        warnings.simplefilter(action='ignore')
+        # Data replace
+        future.cooling[:args.timestep+1] = Historical.Phvac
+        future.temp_zone_0[:args.timestep+1] = (Historical.Tzone * 9/5) + 32
+        future.phvac_0[:args.timestep+1] = Historical.Phvac * -1
+
+        # from matplotlib import pyplot as plt
+        # plt.plot(Historical.Phvac.values[:96])
+        # plt.plot(future.cooling[:args.timestep].values)
+        # plt.show()
+        self.df = future
+        processed_data = {}
+        for zone in range(1):
+            # Data
+            Tout = self.df['temp_outdoor'].to_numpy().reshape(-1, 1)
+            Solar = self.df['solar'].to_numpy().reshape(-1, 1)
+            Day_sin = self.df['day_sin'].to_numpy().reshape(-1, 1)
+            Day_cos = self.df['day_cos'].to_numpy().reshape(-1, 1)
+            Occ = self.df['occ_{}'.format(zone)].to_numpy().reshape(-1, 1)
+            Tzone = self.df['temp_zone_{}'.format(zone)].to_numpy().reshape(-1, 1)
+            Phvac = self.df['phvac_{}'.format(zone)].to_numpy().reshape(-1, 1)
+            try:
+                Tset = self.df['setpt_{}'.format(zone)].to_numpy().reshape(-1, 1)
+            except:
+                print("no setpoint detected, use Zone temperature instead")
+                Tset = Tzone
+
+            upper = (1 - Occ / 3) * 80 + (Occ / 3) * 75
+            lower = (1 - Occ / 3) * 65 + (Occ / 3) * 70
+
+            weight = np.ones(96) * 1
+            weight[6 * 4:18 * 4] = 2
+            price = np.ones(96) * 10
+            price[15 * 4: 18 * 4] = 50
+            daylen = int(Tzone.shape[0] / 96)
+            weight = np.tile(weight, daylen).reshape(-1, 1)
+            price = np.tile(price, daylen).reshape(-1, 1)
+            # Scaler
+            # Normalization
+            Toutscaled = saved_scalers['ToutScaler'].transform(Tout).reshape(-1, 1)
+            Solarscaled = saved_scalers['SolarScaler'].transform(Solar).reshape(-1, 1)
+            Occscaled = saved_scalers['OccScaler'].transform(Occ).reshape(-1, 1)
+            Tzonescaled = saved_scalers['TzoneScaler'].transform(Tzone).reshape(-1, 1)
+            Phvacscaled = saved_scalers['PhvacScaler'].transform(Occ).reshape(-1, 1)
+            Tsetscaled = saved_scalers['TsetScaler'].transform(Tzone).reshape(-1, 1)
+            upperscaled = saved_scalers['TzoneScaler'].transform(upper).reshape(-1, 1)
+            lowerscaled = saved_scalers['TzoneScaler'].transform(lower).reshape(-1, 1)
+            # Summary
+            Summary = np.concatenate((Tzonescaled, Toutscaled, Solarscaled, Day_sin, Day_cos, Occscaled,
+                                      Tsetscaled, Phvacscaled, upperscaled, lowerscaled, weight, price), axis=1)
+            # Collect
+            space = {}
+            space['Day_sin'], space['Day_cos'] = Day_sin, Day_cos
+            space['Tout'], space['Solar'] = Tout, Solar
+            space['Occ'], space['Tzone'], space['Tset'], space['Phvac'] = Occ, Tzone, Tset, Phvac
+
+            space['Toutscaled'], space['Solarscaled'], space['Occscaled'] = Toutscaled, Solarscaled, Occscaled
+            space['Tzonescaled'], space['Tsetscaled'], space['Phvacscaled'] = Tzonescaled, Tsetscaled, Phvacscaled
+            space['Summary'] = Summary
+            processed_data[zone] = space
+        self.processed_data = processed_data
+        inputX = []
+        inputX.append(self.processed_data[zone]["Summary"][args.timestep - args.enco - 1 : args.timestep + args.deco - 1, :])
+        myset = MyData(inputX, inputX)
+        params = {'batch_size': 1,
+                  'shuffle': False}
+        self.EplusLoader = DataLoader(myset, **params)
+
+
+
+

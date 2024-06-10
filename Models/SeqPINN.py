@@ -12,10 +12,48 @@ class gru_Linear(nn.Module):
 
     def forward(self, x):
         embedding = self.Fc1(x)
+        embedding = self.Fc2(embedding)
+        return embedding
+
+class gru_Linear_relu(nn.Module):
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super(gru_Linear_relu, self).__init__()
+        self.Fc1 = nn.Linear(in_features=input_size, out_features=hidden_size, bias=True)
+        self.Fc2 = nn.Linear(in_features=hidden_size, out_features=output_size, bias=False)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        embedding = self.Fc1(x)
         embedding = self.relu(embedding)
         embedding = self.Fc2(embedding)
         return embedding
 
+class gru_nonLinear(nn.Module):
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super(gru_nonLinear, self).__init__()
+        self.Fc1 = nn.Linear(in_features=input_size, out_features=hidden_size, bias=True)
+        self.Fc2 = nn.Linear(in_features=hidden_size, out_features=output_size, bias=False)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        embedding = self.Fc1(x)
+        embedding = self.relu(embedding)
+        embedding = self.Fc2(embedding)
+        return embedding
+
+class hvac_Linear(nn.Module):
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super(hvac_Linear, self).__init__()
+        self.Fc1 = nn.Linear(in_features=input_size,  out_features=hidden_size, bias=True)
+        self.Fc2 = nn.Linear(in_features=hidden_size, out_features=output_size, bias=True)
+
+    def forward(self, x):
+        embedding = self.Fc1(x)
+        embedding = self.Fc2(embedding)
+        return embedding
 
 class gru_encoder(nn.Module):
 
@@ -56,7 +94,6 @@ class gru_decoder(nn.Module):
 
         return output, self.hidden
 
-
 class SeqPinn(nn.Module):
     def __init__(self, para):
         super().__init__()
@@ -70,6 +107,9 @@ class SeqPinn(nn.Module):
         self.encoder_hvac = gru_encoder(input_size=para["encoder_hvac_in"],
                                         hidden_size=para["encoder_hvac_h"],
                                         output_size=para["encoder_hvac_out"])
+        self.encoder_hvac_linear = hvac_Linear(input_size=para["encoder_hvac_in"],
+                                               hidden_size=para["encoder_hvac_h"],
+                                               output_size=para["encoder_hvac_out"])
         self.decoder_external = gru_decoder(input_size=para["decoder_external_in"],
                                             hidden_size=para["decoder_external_h"],
                                             output_size=para["decoder_external_out"])
@@ -79,13 +119,31 @@ class SeqPinn(nn.Module):
         self.decoder_hvac = gru_decoder(input_size=para["decoder_hvac_in"],
                                         hidden_size=para["decoder_hvac_h"],
                                         output_size=para["decoder_hvac_out"])
+        self.decoder_hvac_linear = hvac_Linear(input_size=para["encoder_hvac_in"],
+                                               hidden_size=para["encoder_hvac_h"],
+                                               output_size=para["encoder_hvac_out"])
         self.encoder_out = gru_Linear(input_size=para["En_out_insize"],
                                       hidden_size=para["En_out_hidden"],
                                       output_size=para["En_out_outsize"])
         self.decoder_out = gru_Linear(input_size=para["De_out_insize"],
                                       hidden_size=para["De_out_hidden"],
                                       output_size=para["De_out_outsize"])
+        self.encoder_out_relu = gru_Linear_relu(input_size=para["En_out_insize_relu"],
+                                                hidden_size=para["En_out_hidden_relu"],
+                                                output_size=para["En_out_outsize_relu"])
+        self.decoder_out_relu = gru_Linear_relu(input_size=para["De_out_insize_relu"],
+                                                hidden_size=para["De_out_hidden_relu"],
+                                                 output_size=para["De_out_outsize_relu"])
+
+        self.encoder_nonlinear_out = gru_Linear(input_size=para["En_Nonlinear_out_insize"],
+                                                hidden_size=para["En_Nonlinear_out_hidden"],
+                                                output_size=para["En_Nonlinear_out_outsize"])
+        self.decoder_nonlinear_out = gru_Linear(input_size=para["De_Nonlinear_out_insize"],
+                                                hidden_size=para["De_Nonlinear_out_hidden"],
+                                                output_size=para["De_Nonlinear_out_outsize"])
+        self.HVAC_module = para['HVAC_module']
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 
     def forward(self, input_X):
         """
@@ -122,88 +180,200 @@ class SeqPinn(nn.Module):
         # HVAC
         Decoder_X_HVAC = input_X[:, self.encoLen + 1:, [7]]
 
-        #Save
+        # Save
         encoder_output_list = torch.zeros(Encoder_X_Ext.shape[0], Encoder_X_Ext.shape[1], 1).to(self.device)
         decoder_output_list = torch.zeros(Decoder_X_Ext.shape[0], Decoder_X_Ext.shape[1], 1).to(self.device)
         current_output_list = torch.zeros(Current_X_Ext.shape[0], Current_X_Ext.shape[1], 1).to(self.device)
 
-        # Encoder initialize
-        encoder_hidden_Ext_ = torch.zeros(1, Encoder_X_Ext.shape[0], self.encoder_external.gru.hidden_size).to(self.device)
-        encoder_hidden_hid_Int_ = torch.zeros(1, Encoder_X_Int.shape[0], self.encoder_internal.gru.hidden_size).to(self.device)
-        encoder_hidden_hid_HVAC_ = torch.zeros(1, Encoder_X_HVAC.shape[0], self.encoder_hvac.gru.hidden_size).to(self.device)
-        Current_X_zone = input_X[:, [[0]], [0]]
-        Encoder_X_Ext_ = torch.cat((Current_X_zone, Encoder_X_Ext[:, [0], :]), 2)
-        Encoder_X_Int_ = torch.cat((Current_X_zone, Encoder_X_Int[:, [0], :]), 2)
-        Encoder_X_HVAC_ = Encoder_X_HVAC[:, [0], :]
+        # Different HVAC module
+        if self.HVAC_module == 'gru':
+            # Encoder initialize
+            encoder_hidden_Ext_ = torch.zeros(1, Encoder_X_Ext.shape[0], self.encoder_external.gru.hidden_size).to(
+                self.device)
+            encoder_hidden_hid_Int_ = torch.zeros(1, Encoder_X_Int.shape[0], self.encoder_internal.gru.hidden_size).to(
+                self.device)
+            encoder_hidden_hid_HVAC_ = torch.zeros(1, Encoder_X_HVAC.shape[0], self.encoder_hvac.gru.hidden_size).to(
+                self.device)
+            Current_X_zone = input_X[:, [[0]], [0]]
+            Encoder_X_Ext_ = torch.cat((Current_X_zone, Encoder_X_Ext[:, [0], :]), 2)
+            Encoder_X_Int_ = torch.cat((Current_X_zone, Encoder_X_Int[:, [0], :]), 2)
+            Encoder_X_HVAC_ = Encoder_X_HVAC[:, [0], :]
 
-        for i in range(Encoder_X_Ext.shape[1] - 1):
+            for i in range(Encoder_X_Ext.shape[1] - 1):
+                encoder_output_Ext_, encoder_hidden_Ext_ = self.encoder_external(Encoder_X_Ext_, encoder_hidden_Ext_)
+                encoder_output_Int_, encoder_hidden_hid_Int_ = self.encoder_internal(Encoder_X_Int_,
+                                                                                     encoder_hidden_hid_Int_)
+                encoder_output_HVAC_, encoder_hidden_hid_HVAC_ = self.encoder_hvac(Encoder_X_HVAC_,
+                                                                                   encoder_hidden_hid_HVAC_)
+
+                encoder_out_embed = torch.cat((encoder_output_Ext_, encoder_output_Int_, encoder_output_HVAC_), 2)
+                encoder_output = self.encoder_out_relu(encoder_out_embed)  # Heat Flux deveided by (Cp*M)
+                Current_X_zone += encoder_output
+                encoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+                i += 1
+                Encoder_X_Ext_ = torch.cat((Current_X_zone, Encoder_X_Ext[:, [i], :]), 2)
+                Encoder_X_Int_ = torch.cat((Current_X_zone, Encoder_X_Int[:, [i], :]), 2)
+                Encoder_X_HVAC_ = Encoder_X_HVAC[:, [i], :]
+
             encoder_output_Ext_, encoder_hidden_Ext_ = self.encoder_external(Encoder_X_Ext_, encoder_hidden_Ext_)
-            encoder_output_Int_, encoder_hidden_hid_Int_ = self.encoder_internal(Encoder_X_Int_, encoder_hidden_hid_Int_)
-            encoder_output_HVAC_, encoder_hidden_hid_HVAC_ = self.encoder_hvac(Encoder_X_HVAC_, encoder_hidden_hid_HVAC_)
-            
+            encoder_output_Int_, encoder_hidden_hid_Int_ = self.encoder_internal(Encoder_X_Int_,
+                                                                                 encoder_hidden_hid_Int_)
+            encoder_output_HVAC_, encoder_hidden_hid_HVAC_ = self.encoder_hvac(Encoder_X_HVAC_,
+                                                                               encoder_hidden_hid_HVAC_)
+
             encoder_out_embed = torch.cat((encoder_output_Ext_, encoder_output_Int_, encoder_output_HVAC_), 2)
-            encoder_output = self.encoder_out(encoder_out_embed)  #Heat Flux deveided by (Cp*M)
+            encoder_output = self.encoder_out_relu(encoder_out_embed)  # Heat Flux deveided by (Cp*M)
             Current_X_zone += encoder_output
             encoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
-            i += 1
-            Encoder_X_Ext_ = torch.cat((Current_X_zone, Encoder_X_Ext[:, [i], :]), 2)
-            Encoder_X_Int_ = torch.cat((Current_X_zone, Encoder_X_Int[:, [i], :]), 2)
-            Encoder_X_HVAC_ = Encoder_X_HVAC[:, [i], :]
 
-        encoder_output_Ext_, encoder_hidden_Ext_ = self.encoder_external(Encoder_X_Ext_, encoder_hidden_Ext_)
-        encoder_output_Int_, encoder_hidden_hid_Int_ = self.encoder_internal(Encoder_X_Int_, encoder_hidden_hid_Int_)
-        encoder_output_HVAC_, encoder_hidden_hid_HVAC_ = self.encoder_hvac(Encoder_X_HVAC_, encoder_hidden_hid_HVAC_)
+            # Update current measurment
+            Current_X_zone = input_X[:, self.encoLen:self.encoLen + 1, [0]]
+            Current_X_Ext_ = torch.cat((Current_X_zone, Current_X_Ext[:, [0], :]), 2)
+            Current_X_Int_ = torch.cat((Current_X_zone, Current_X_Int[:, [0], :]), 2)
+            Current_X_HVAC_ = Current_X_HVAC[:, [0], :]
 
-        encoder_out_embed = torch.cat((encoder_output_Ext_, encoder_output_Int_, encoder_output_HVAC_), 2)
-        encoder_output = self.encoder_out(encoder_out_embed)  # Heat Flux deveided by (Cp*M)
-        Current_X_zone += encoder_output
-        encoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+            current_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Current_X_Ext_, encoder_hidden_Ext_)
+            current_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Current_X_Int_,
+                                                                                 encoder_hidden_hid_Int_)
+            current_output_HVAC_, decoder_hidden_hid_HVAC_ = self.decoder_hvac(Current_X_HVAC_,
+                                                                               encoder_hidden_hid_HVAC_)
 
-        #Update current measurment
-        Current_X_zone = input_X[:, self.encoLen:self.encoLen + 1, [0]]
-        Current_X_Ext_ = torch.cat((Current_X_zone, Current_X_Ext[:, [0], :]), 2)
-        Current_X_Int_ = torch.cat((Current_X_zone, Current_X_Int[:, [0], :]), 2)
-        Current_X_HVAC_ = Current_X_HVAC[:, [0], :]
+            current_out_embed = torch.cat((current_output_Ext_, current_output_Int_, current_output_HVAC_), 2)
+            decoder_output = self.decoder_out_relu(current_out_embed)  # Heat Flux deveided by (Cp*M)
+            Current_X_zone += decoder_output
+            current_output_list[:, :, :] = Current_X_zone
 
-        current_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Current_X_Ext_, encoder_hidden_Ext_)
-        current_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Current_X_Int_, encoder_hidden_hid_Int_)
-        current_output_HVAC_, decoder_hidden_hid_HVAC_ = self.decoder_hvac(Current_X_HVAC_, encoder_hidden_hid_HVAC_)
+            # Decoder initialize
+            Decoder_X_Ext_ = torch.cat((Current_X_zone, Decoder_X_Ext[:, [0], :]), 2)
+            Decoder_X_Int_ = torch.cat((Current_X_zone, Decoder_X_Int[:, [0], :]), 2)
+            Decoder_X_HVAC_ = Decoder_X_HVAC[:, [0], :]
 
-        current_out_embed = torch.cat((current_output_Ext_, current_output_Int_, current_output_HVAC_), 2)
-        decoder_output = self.decoder_out(current_out_embed)  # Heat Flux deveided by (Cp*M)
-        Current_X_zone += decoder_output
-        current_output_list[:, :, :] = Current_X_zone
+            # Decoder Prediction
+            for i in range(Decoder_X_Ext.shape[1] - 1):
+                decoder_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Decoder_X_Ext_, decoder_hidden_Ext_)
+                decoder_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Decoder_X_Int_,
+                                                                                     decoder_hidden_hid_Int_)
+                decoder_output_HVAC_, decoder_hidden_hid_HVAC_ = self.decoder_hvac(Decoder_X_HVAC_,
+                                                                                   decoder_hidden_hid_HVAC_)
 
-        # Decoder initialize
-        Decoder_X_Ext_ = torch.cat((Current_X_zone, Decoder_X_Ext[:, [0], :]), 2)
-        Decoder_X_Int_ = torch.cat((Current_X_zone, Decoder_X_Int[:, [0], :]), 2)
-        Decoder_X_HVAC_ = Decoder_X_HVAC[:, [0], :]
+                decoder_out_embed = torch.cat((decoder_output_Ext_, decoder_output_Int_, decoder_output_HVAC_), 2)
+                decoder_output = self.decoder_out_relu(decoder_out_embed)  # Heat Flux deveided by (Cp*M)
+                Current_X_zone += decoder_output
+                decoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+                i += 1
+                Decoder_X_Ext_ = torch.cat((Current_X_zone, Decoder_X_Ext[:, [i], :]), 2)
+                Decoder_X_Int_ = torch.cat((Current_X_zone, Decoder_X_Int[:, [i], :]), 2)
+                Decoder_X_HVAC_ = Decoder_X_HVAC[:, [i], :]
 
-        # Decoder Prediction
-        for i in range(Decoder_X_Ext.shape[1] - 1):
             decoder_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Decoder_X_Ext_, decoder_hidden_Ext_)
-            decoder_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Decoder_X_Int_, decoder_hidden_hid_Int_)
-            decoder_output_HVAC_, decoder_hidden_hid_HVAC_ = self.decoder_hvac(Decoder_X_HVAC_, decoder_hidden_hid_HVAC_)
+            decoder_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Decoder_X_Int_,
+                                                                                 decoder_hidden_hid_Int_)
+            decoder_output_HVAC_, decoder_hidden_hid_HVAC_ = self.decoder_hvac(Decoder_X_HVAC_,
+                                                                               decoder_hidden_hid_HVAC_)
 
             decoder_out_embed = torch.cat((decoder_output_Ext_, decoder_output_Int_, decoder_output_HVAC_), 2)
-            decoder_output = self.decoder_out(decoder_out_embed)  #Heat Flux deveided by (Cp*M)
+            decoder_output = self.decoder_out_relu(decoder_out_embed)  # Heat Flux deveided by (Cp*M)
             Current_X_zone += decoder_output
             decoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
-            i += 1
-            Decoder_X_Ext_ = torch.cat((Current_X_zone, Decoder_X_Ext[:, [i], :]), 2)
-            Decoder_X_Int_ = torch.cat((Current_X_zone, Decoder_X_Int[:, [i], :]), 2)
-            Decoder_X_HVAC_ = Decoder_X_HVAC[:, [i], :]
 
-        decoder_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Decoder_X_Ext_, decoder_hidden_Ext_)
-        decoder_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Decoder_X_Int_, decoder_hidden_hid_Int_)
-        decoder_output_HVAC_, decoder_hidden_hid_HVAC_ = self.decoder_hvac(Decoder_X_HVAC_, decoder_hidden_hid_HVAC_)
+            outputs = torch.cat((encoder_output_list, current_output_list, decoder_output_list), 1)
+        if self.HVAC_module == 'linear':
+            # Encoder initialize
+            encoder_hidden_Ext_ = torch.zeros(1, Encoder_X_Ext.shape[0], self.encoder_external.gru.hidden_size).to(
+                self.device)
+            encoder_hidden_hid_Int_ = torch.zeros(1, Encoder_X_Int.shape[0], self.encoder_internal.gru.hidden_size).to(
+                self.device)
+            Current_X_zone = input_X[:, [[0]], [0]]
+            Encoder_X_Ext_ = torch.cat((Current_X_zone, Encoder_X_Ext[:, [0], :]), 2)
+            Encoder_X_Int_ = torch.cat((Current_X_zone, Encoder_X_Int[:, [0], :]), 2)
+            Encoder_X_HVAC_ = Encoder_X_HVAC[:, [0], :]
 
-        decoder_out_embed = torch.cat((decoder_output_Ext_, decoder_output_Int_, decoder_output_HVAC_), 2)
-        decoder_output = self.decoder_out(decoder_out_embed)  # Heat Flux deveided by (Cp*M)
-        Current_X_zone += decoder_output
-        decoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+            for i in range(Encoder_X_Ext.shape[1] - 1):
+                encoder_output_Ext_, encoder_hidden_Ext_ = self.encoder_external(Encoder_X_Ext_, encoder_hidden_Ext_)
+                encoder_output_Int_, encoder_hidden_hid_Int_ = self.encoder_internal(Encoder_X_Int_, encoder_hidden_hid_Int_)
+                encoder_output_HVAC_ = self.encoder_hvac_linear(Encoder_X_HVAC_)
 
-        outputs = torch.cat((encoder_output_list, current_output_list, decoder_output_list), 1)
+                encoder_nonlinear_embed = torch.cat((encoder_output_Ext_, encoder_output_Int_), 2)
+                encoder_nonlinear_embed_output = self.encoder_nonlinear_out(encoder_nonlinear_embed)
+                encoder_out_embed = torch.cat((encoder_nonlinear_embed_output, encoder_output_HVAC_), 2)
+
+                encoder_output = self.encoder_out(encoder_out_embed)  # Heat Flux deveided by (Cp*M)
+
+                Current_X_zone += encoder_output
+                encoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+                i += 1
+                Encoder_X_Ext_ = torch.cat((Current_X_zone, Encoder_X_Ext[:, [i], :]), 2)
+                Encoder_X_Int_ = torch.cat((Current_X_zone, Encoder_X_Int[:, [i], :]), 2)
+                Encoder_X_HVAC_ = Encoder_X_HVAC[:, [i], :]
+
+            encoder_output_Ext_, encoder_hidden_Ext_ = self.encoder_external(Encoder_X_Ext_, encoder_hidden_Ext_)
+            encoder_output_Int_, encoder_hidden_hid_Int_ = self.encoder_internal(Encoder_X_Int_, encoder_hidden_hid_Int_)
+            encoder_output_HVAC_ = self.encoder_hvac_linear(Encoder_X_HVAC_)
+
+            encoder_nonlinear_embed = torch.cat((encoder_output_Ext_, encoder_output_Int_), 2)
+            encoder_nonlinear_embed_output = self.encoder_nonlinear_out(encoder_nonlinear_embed)
+            encoder_out_embed = torch.cat((encoder_nonlinear_embed_output, encoder_output_HVAC_), 2)
+
+            encoder_output = self.encoder_out(encoder_out_embed)  # Heat Flux deveided by (Cp*M)
+            Current_X_zone += encoder_output
+            encoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+
+            # Update current measurment
+            Current_X_zone = input_X[:, self.encoLen:self.encoLen + 1, [0]]
+            Current_X_Ext_ = torch.cat((Current_X_zone, Current_X_Ext[:, [0], :]), 2)
+            Current_X_Int_ = torch.cat((Current_X_zone, Current_X_Int[:, [0], :]), 2)
+            Current_X_HVAC_ = Current_X_HVAC[:, [0], :]
+
+            current_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Current_X_Ext_, encoder_hidden_Ext_)
+            current_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Current_X_Int_, encoder_hidden_hid_Int_)
+            current_output_HVAC_ = self.decoder_hvac_linear(Current_X_HVAC_)
+
+            decoder_nonlinear_embed = torch.cat((current_output_Ext_, current_output_Int_), 2)
+            decoder_nonlinear_embed_output = self.decoder_nonlinear_out(decoder_nonlinear_embed)
+            current_out_embed = torch.cat((decoder_nonlinear_embed_output, current_output_HVAC_), 2)
+
+            decoder_output = self.decoder_out(current_out_embed)  # Heat Flux deveided by (Cp*M)
+            Current_X_zone += decoder_output
+            current_output_list[:, :, :] = Current_X_zone
+
+            # Decoder initialize
+            Decoder_X_Ext_ = torch.cat((Current_X_zone, Decoder_X_Ext[:, [0], :]), 2)
+            Decoder_X_Int_ = torch.cat((Current_X_zone, Decoder_X_Int[:, [0], :]), 2)
+            Decoder_X_HVAC_ = Decoder_X_HVAC[:, [0], :]
+
+            # Decoder Prediction
+            for i in range(Decoder_X_Ext.shape[1] - 1):
+                decoder_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Decoder_X_Ext_, decoder_hidden_Ext_)
+                decoder_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Decoder_X_Int_,
+                                                                                     decoder_hidden_hid_Int_)
+                decoder_output_HVAC_ = self.decoder_hvac_linear(Decoder_X_HVAC_)
+
+                decoder_nonlinear_embed = torch.cat((decoder_output_Ext_, decoder_output_Int_), 2)
+                decoder_nonlinear_embed_output = self.decoder_nonlinear_out(decoder_nonlinear_embed)
+                decoder_out_embed = torch.cat((decoder_nonlinear_embed_output, decoder_output_HVAC_), 2)
+
+                decoder_output = self.decoder_out(decoder_out_embed)  # Heat Flux deveided by (Cp*M)
+                Current_X_zone += decoder_output
+                decoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+                i += 1
+                Decoder_X_Ext_ = torch.cat((Current_X_zone, Decoder_X_Ext[:, [i], :]), 2)
+                Decoder_X_Int_ = torch.cat((Current_X_zone, Decoder_X_Int[:, [i], :]), 2)
+                Decoder_X_HVAC_ = Decoder_X_HVAC[:, [i], :]
+
+            decoder_output_Ext_, decoder_hidden_Ext_ = self.decoder_external(Decoder_X_Ext_, decoder_hidden_Ext_)
+            decoder_output_Int_, decoder_hidden_hid_Int_ = self.decoder_internal(Decoder_X_Int_, decoder_hidden_hid_Int_)
+            decoder_output_HVAC_ = self.decoder_hvac_linear(Decoder_X_HVAC_)
+
+            decoder_nonlinear_embed = torch.cat((decoder_output_Ext_, decoder_output_Int_), 2)
+            decoder_nonlinear_embed_output = self.decoder_nonlinear_out(decoder_nonlinear_embed)
+            decoder_out_embed = torch.cat((decoder_nonlinear_embed_output, decoder_output_HVAC_), 2)
+
+            decoder_output = self.decoder_out(decoder_out_embed)  # Heat Flux deveided by (Cp*M)
+            Current_X_zone += decoder_output
+            decoder_output_list[:, i, :] = torch.squeeze(Current_X_zone, dim=1)
+
+            outputs = torch.cat((encoder_output_list, current_output_list, decoder_output_list), 1)
+
         return outputs
 
 
@@ -216,8 +386,8 @@ class LSTM(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.gru = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                           num_layers=num_layers, batch_first=True, bias=False)
-        self.Defc = nn.Linear(in_features=hidden_size, out_features=output_size, bias=False)
+                           num_layers=num_layers, batch_first=True, bias=True)
+        self.Defc = nn.Linear(in_features=hidden_size, out_features=output_size, bias=True)
 
     def forward(self, x_input, encoder_hidden_states):
         gru_out, self.hidden = self.gru(x_input, encoder_hidden_states)
@@ -238,6 +408,7 @@ class Baseline(nn.Module):
     def forward(self, input_X):
         """
         Baseline: LSTM
+        0.Tzone; 1:Tamb; 2:Solar; 3:Day_sin; 4:Day_cos; 5.Occ; 6.Tset; 7.Phvac
         """
         Decoder_X = input_X[:, self.encoLen:, [1, 2, 3, 4, 5, 7]]
         Current_X_zone = input_X[:, self.encoLen:self.encoLen + 1, [0]]

@@ -1,0 +1,13 @@
+ ReadVarsESO
+ processing:../Dataset/Eplus_Generator/Eplus_model/testbed.rvi
+ input file:../Dataset/Eplus_Generator/Eplus_out/SFH/eplusout.eso
+ output file:../Dataset/Eplus_Generator/Eplus_out/SFH/eplusout.csv
+ getting all vars from:../Dataset/Eplus_Generator/Eplus_out/SFH/eplusout.eso
+  number variables requested for output=          12
+ ReadVars Run Time=00hr 00min  0.03sec
+ ReadVarsESO program completed successfully.
+ ReadVarsESO
+ processing:../Dataset/Eplus_Generator/Eplus_model/testbed.mvi
+ Requested ESO file=../Dataset/Eplus_Generator/Eplus_out/SFH/eplusout.mtr
+ does not exist.  ReadVarsESO program terminated.
+ ReadVarsESO program terminated.

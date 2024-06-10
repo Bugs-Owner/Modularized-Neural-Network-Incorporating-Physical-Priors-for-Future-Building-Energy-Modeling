@@ -9,7 +9,9 @@ import torch
 import matplotlib.dates as dates
 import matplotlib.pyplot as plt
 from Models import SeqPINN
+from Models import OptNN
 from Play import train_model, test_model, check_model
+from DPC import Online_solve
 import matplotlib
 from matplotlib.ticker import MaxNLocator
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -26,7 +28,7 @@ class ddpred:
         print('Preparing data')
         start_time = time.time()
         DC = DataCook()
-        DC.data_preprocess(datapath=args.path, num_zone=1)
+        DC.data_preprocess(datapath=args.path, num_zone=1, args=args)
         DC.data_roll(args=args)
         DC.data_loader(args.training_batch)
         para = paras(args=args)
@@ -37,15 +39,26 @@ class ddpred:
 
     def train(self):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = SeqPINN.SeqPinn(self.para).to(device)
+        if self.args.modeltype == 'SeqPINN':
+            model = SeqPINN.SeqPinn(self.para).to(device)
+        if self.args.modeltype == 'Baseline':
+            model = SeqPINN.Baseline(self.para).to(device)
         start_time = time.time()
-        print('Trainging')
+        print('Training')
         self.model, self.train_losses, self.valid_losses = train_model(model=model,
                                                                        train_loader=self.dataset.TrainLoader[0],
                                                                        valid_loader=self.dataset.ValidLoader[0],
+                                                                       test_loader =self.dataset.TestLoader[0],
                                                                        lr=self.para['lr'],
                                                                        epochs=self.para['epochs'],
-                                                                       patience=self.para['patience'])
+                                                                       patience=self.para['patience'],
+                                                                       tempscal = self.dataset.processed_data[0]['TzoneScaler'],
+                                                                       enlen = self.para['encoLen'],
+                                                                       delen=self.para['decoLen'],
+                                                                       rawdf = self.dataset.test_raw_df,
+                                                                       plott = self.args.plott,
+                                                                       modeltype = self.args.modeltype,
+                                                                       scale = self.args.scale,)
         print("--- %s seconds ---" % (time.time() - start_time))
         print('Saving start')
 
@@ -90,7 +103,10 @@ class ddpred:
         print('Loading start')
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         start_time = time.time()
-        model = SeqPINN.SeqPinn(self.para).to(device)
+        if self.args.modeltype == 'SeqPINN':
+            model = SeqPINN.SeqPinn(self.para).to(device)
+        if self.args.modeltype == 'Baseline':
+            model = SeqPINN.Baseline(self.para).to(device)
         folder_name = "../Saved/Trained_mdl" + 'Enco{}_Deco{}'.format(str(self.dataset.enLen), str(self.dataset.deLen))
         mdl_name = 'Train_with_{}days\nTest_on{}.pth'.format(str(self.dataset.trainday), self.dataset.test_start)
         if not os.path.exists(folder_name):
@@ -160,6 +176,88 @@ class ddpred:
             pickle.dump(mape, f)
         print("--- %s seconds ---" % (time.time() - start_time))
 
+    def Eplustest(self, dataloader):
+        def MAPE(y_true, y_pred):
+            y_true, y_pred = np.array(y_true), np.array(y_pred)
+            return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+        def MAE(y_true, y_pred):
+            y_true, y_pred = np.array(y_true), np.array(y_pred)
+            return np.mean(np.abs(y_true - y_pred))
+
+        outputs = test_model(model=self.model, test_loader=dataloader)
+        # De-norm
+        to_out, en_out, de_out = [], [], []
+        tempscal = self.dataset.processed_data[0]['TzoneScaler']
+        for idx in range(outputs.shape[0]):
+            to_out.append(tempscal.inverse_transform(outputs[[idx], :, :].reshape(-1, 1)))
+            en_out.append(tempscal.inverse_transform(outputs[[idx], :self.para['encoLen'], :].reshape(-1, 1)))
+            de_out.append(tempscal.inverse_transform(outputs[[idx], self.para['encoLen']:, :].reshape(-1, 1)))
+        self.to_out = to_out
+        self.en_out = en_out
+        self.de_out = de_out
+
+        folder_name = "../EplusResult/" + 'Enco{}_Deco{}'.format(str(self.dataset.enLen), str(self.dataset.deLen))
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        csv_name = '(raw)Train_with_{}days\nTest_on{}.csv'.format(str(self.dataset.trainday), self.dataset.test_start)
+        savecsv = os.path.join(folder_name, csv_name)
+        self.dataset.test_raw_df.to_csv(savecsv)
+        test_len = len(self.de_out)
+        pred_len = self.dataset.deLen
+        test_result = {}
+        mae = {}
+        mape = {}
+        gdtruth = (self.dataset.test_raw_df['temp_zone_{}'.format(0)].values - 32) * 5 / 9
+        for timestep in range(test_len):
+            tem = self.de_out[timestep]
+            tem = (tem - 32) * 5 / 9
+            test_result[timestep] = tem
+            y_true = gdtruth[timestep: timestep + pred_len].reshape(-1, 1)
+            y_mear = self.de_out[timestep]
+            y_mear = (y_mear - 32) * 5 / 9
+            mae[timestep] = MAE(y_true=y_true, y_pred=y_mear)
+            mape[timestep] = MAPE(y_true=y_true, y_pred=y_mear)
+        self.mae = mae
+        self.mape = mape
+        dic_name = '(pred)Train_with_{}days\nTest_on{}.pkl'.format(str(self.dataset.trainday), self.dataset.test_start)
+        savedic = os.path.join(folder_name, dic_name)
+        with open(savedic, 'wb') as f:
+            pickle.dump(test_result, f)
+        mae_name = '(mae)Train_with_{}days\nTest_on{}.pkl'.format(str(self.dataset.trainday), self.dataset.test_start)
+        savemae = os.path.join(folder_name, mae_name)
+        with open(savemae, 'wb') as f:
+            pickle.dump(mae, f)
+        mape_name = '(mape)Train_with_{}days\nTest_on{}.pkl'.format(str(self.dataset.trainday), self.dataset.test_start)
+        savemape = os.path.join(folder_name, mape_name)
+        with open(savemape, 'wb') as f:
+            pickle.dump(mape, f)
+
+    def Solve(self, dataloader):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        start_time = time.time()
+        if self.args.modeltype == 'SeqPINN':
+            model = SeqPINN.SeqPinn(self.para).to(device)
+        if self.args.modeltype == 'Baseline':
+            model = SeqPINN.Baseline(self.para).to(device)
+        folder_name = "../Saved/Trained_mdl" + 'Enco{}_Deco{}'.format(str(self.dataset.enLen), str(self.dataset.deLen))
+        mdl_name = 'Train_with_{}days\nTest_on{}.pth'.format(str(self.dataset.trainday), self.dataset.test_start)
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        loadmodel = os.path.join(folder_name, mdl_name)
+        model.load_state_dict(torch.load(loadmodel))
+        self.model = model
+        print('Solving')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        dynamic_mdl = self.model
+        for param in dynamic_mdl.parameters():
+            param.requires_grad = False
+        u_opt = Online_solve(control_mdl=OptNN.SolNN(self.para).to(device),
+                             dynamic_mdl=dynamic_mdl,
+                             loader=dataloader,
+                             args=self.args)
+        self.u_opt = u_opt
+        print("--- %s seconds ---" % (time.time() - start_time))
+
     def check(self):
         print('Checking start')
         start_time = time.time()
@@ -215,7 +313,7 @@ class ddpred:
         rawdf = self.dataset.test_raw_df
         test_len = len(self.de_out)
         pred_len = self.dataset.deLen
-        fig, ax = plt.subplots(1, 1, figsize=(2.2, 1.2), dpi=300, sharex='col', sharey='row', constrained_layout=True)
+        fig, ax = plt.subplots(1, 1, figsize=(2.2, 1.8), dpi=300, sharex='col', sharey='row', constrained_layout=True)
         ax.plot_date(rawdf.index[:test_len], (rawdf['temp_zone_{}'.format(0)].values[:test_len] - 32) * 5 / 9, '-',
                      linewidth=1, color="#159A9C", label='Measurement')
 
@@ -223,7 +321,7 @@ class ddpred:
             tem = self.outputs_denorm[timestep][:test_len - timestep]
             tem = (tem - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
-                         tem, '--', linewidth=0.4, alpha=0.5, color="gray")
+                         tem, '-', linewidth=1, alpha=0.5, color="gray")
         for timestep in [32]:
             minn = self.outputs_min_denorm[timestep][:test_len - timestep]
             minn = (minn - 32) * 5 / 9
@@ -250,8 +348,8 @@ class ddpred:
         ax.xaxis.set_major_formatter(dates.DateFormatter('%b%d'))
         ax.set_xlabel(None)
         ax.set_ylabel('Temperature[°C]', fontsize=7)
-        ax.set_yticks(np.arange(18, 32, 2))
-        ax.set_ylim(18, 32)
+        ax.set_yticks(np.arange(20, 36, 2))
+        ax.set_ylim(19.5, 34.5)
         ax.margins(x=0)
         plt.show()
 

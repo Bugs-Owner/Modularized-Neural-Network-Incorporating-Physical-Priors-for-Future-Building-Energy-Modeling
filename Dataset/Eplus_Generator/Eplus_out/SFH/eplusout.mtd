@@ -1,0 +1,590 @@
+
+ Meters for 9,EXTERIOR-LIGHTS_UNIT1:Exterior Lights Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=ExteriorLights:Electricity [J]
+  OnMeter=Exterior-Lights:ExteriorLights:Electricity [J]
+
+ Meters for 46,GARAGE-LIGHTS_UNIT1:Exterior Lights Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=ExteriorLights:Electricity [J]
+  OnMeter=Garage-Lights:ExteriorLights:Electricity [J]
+
+ Meters for 60,LIVING HARDWIRED LIGHTING1:Lights Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorLights:Electricity [J]
+  OnMeter=InteriorLights:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorLights:Electricity:SpaceType:GENERAL [J]
+  OnMeter=General:InteriorLights:Electricity [J]
+  OnMeter=General:InteriorLights:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=General:InteriorLights:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 169,LIVING PLUG-IN LIGHTING1:Lights Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorLights:Electricity [J]
+  OnMeter=InteriorLights:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorLights:Electricity:SpaceType:GENERAL [J]
+  OnMeter=General:InteriorLights:Electricity [J]
+  OnMeter=General:InteriorLights:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=General:InteriorLights:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 170,DISHWASHER1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=dishwasher:InteriorEquipment:Electricity [J]
+  OnMeter=dishwasher:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=dishwasher:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 243,REFRIGERATOR1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=refrigerator:InteriorEquipment:Electricity [J]
+  OnMeter=refrigerator:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=refrigerator:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 280,CLOTHESWASHER1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=clotheswasher:InteriorEquipment:Electricity [J]
+  OnMeter=clotheswasher:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=clotheswasher:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 317,ELECTRIC_DRYER1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=electric_dryer:InteriorEquipment:Electricity [J]
+  OnMeter=electric_dryer:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=electric_dryer:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 354,ELECTRIC_RANGE1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=electric_range:InteriorEquipment:Electricity [J]
+  OnMeter=electric_range:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=electric_range:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 391,TELEVISION1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=television:InteriorEquipment:Electricity [J]
+  OnMeter=television:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=television:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 428,ELECTRIC_MELS1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=electric_mels:InteriorEquipment:Electricity [J]
+  OnMeter=electric_mels:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=electric_mels:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 465,IECC_ADJ1:Electric Equipment Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Electricity:SpaceType:GENERAL [J]
+  OnMeter=InteriorEquipment:Electricity [J]
+  OnMeter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+  OnMeter=IECC_adj:InteriorEquipment:Electricity [J]
+  OnMeter=IECC_adj:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=IECC_adj:InteriorEquipment:Electricity:SpaceType:GENERAL [J]
+
+ Meters for 502,LIVING_UNIT1:Zone Ventilation Fan Electricity Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Building [J]
+  OnMeter=Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Fans:Electricity [J]
+  OnMeter=Fans:Electricity:Zone:LIVING_UNIT1 [J]
+  OnMeter=Ventilation (simple):Fans:Electricity [J]
+  OnMeter=Ventilation (simple):Fans:Electricity:Zone:LIVING_UNIT1 [J]
+
+ Meters for 551,LIVING_UNIT1:Zone Air System Sensible Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Building [J]
+  OnMeter=EnergyTransfer:Zone:LIVING_UNIT1 [J]
+  OnMeter=Heating:EnergyTransfer [J]
+  OnMeter=Heating:EnergyTransfer:Zone:LIVING_UNIT1 [J]
+  OnMeter=General:Heating:EnergyTransfer [J]
+  OnMeter=General:Heating:EnergyTransfer:Zone:LIVING_UNIT1 [J]
+
+ Meters for 636,LIVING_UNIT1:Zone Air System Sensible Cooling Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Building [J]
+  OnMeter=EnergyTransfer:Zone:LIVING_UNIT1 [J]
+  OnMeter=Cooling:EnergyTransfer [J]
+  OnMeter=Cooling:EnergyTransfer:Zone:LIVING_UNIT1 [J]
+  OnMeter=General:Cooling:EnergyTransfer [J]
+  OnMeter=General:Cooling:EnergyTransfer:Zone:LIVING_UNIT1 [J]
+
+ Meters for 688,ATTIC_UNIT1:Zone Air System Sensible Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Building [J]
+  OnMeter=EnergyTransfer:Zone:ATTIC_UNIT1 [J]
+  OnMeter=Heating:EnergyTransfer [J]
+  OnMeter=Heating:EnergyTransfer:Zone:ATTIC_UNIT1 [J]
+  OnMeter=General:Heating:EnergyTransfer [J]
+  OnMeter=General:Heating:EnergyTransfer:Zone:ATTIC_UNIT1 [J]
+
+ Meters for 725,ATTIC_UNIT1:Zone Air System Sensible Cooling Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Building [J]
+  OnMeter=EnergyTransfer:Zone:ATTIC_UNIT1 [J]
+  OnMeter=Cooling:EnergyTransfer [J]
+  OnMeter=Cooling:EnergyTransfer:Zone:ATTIC_UNIT1 [J]
+  OnMeter=General:Cooling:EnergyTransfer [J]
+  OnMeter=General:Cooling:EnergyTransfer:Zone:ATTIC_UNIT1 [J]
+
+ Meters for 753,CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Building [J]
+  OnMeter=EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J]
+  OnMeter=Heating:EnergyTransfer [J]
+  OnMeter=Heating:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J]
+  OnMeter=General:Heating:EnergyTransfer [J]
+  OnMeter=General:Heating:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J]
+
+ Meters for 790,CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Building [J]
+  OnMeter=EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J]
+  OnMeter=Cooling:EnergyTransfer [J]
+  OnMeter=Cooling:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J]
+  OnMeter=General:Cooling:EnergyTransfer [J]
+  OnMeter=General:Cooling:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J]
+
+ Meters for 818,LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Heating Energy [J]
+  OnMeter=DistrictHeating:Facility [J]
+  OnMeter=DistrictHeating:HVAC [J]
+  OnMeter=Heating:DistrictHeating [J]
+  OnMeter=General:Heating:DistrictHeating [J]
+
+ Meters for 867,LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Cooling Energy [J]
+  OnMeter=DistrictCooling:Facility [J]
+  OnMeter=DistrictCooling:HVAC [J]
+  OnMeter=Cooling:DistrictCooling [J]
+  OnMeter=General:Cooling:DistrictCooling [J]
+
+ Meters for 916,Whole Building:Facility Total Purchased Electricity Energy [J]
+  OnMeter=ElectricityPurchased:Facility [J]
+  OnMeter=ElectricityPurchased:Plant [J]
+  OnMeter=Cogeneration:ElectricityPurchased [J]
+  OnMeter=General:Cogeneration:ElectricityPurchased [J]
+
+ Meters for 965,Whole Building:Facility Total Surplus Electricity Energy [J]
+  OnMeter=ElectricitySurplusSold:Facility [J]
+  OnMeter=ElectricitySurplusSold:Plant [J]
+  OnMeter=Cogeneration:ElectricitySurplusSold [J]
+  OnMeter=General:Cogeneration:ElectricitySurplusSold [J]
+
+ Meters for 1014,Whole Building:Facility Net Purchased Electricity Energy [J]
+  OnMeter=ElectricityNet:Facility [J]
+  OnMeter=ElectricityNet:Plant [J]
+  OnMeter=Cogeneration:ElectricityNet [J]
+  OnMeter=General:Cogeneration:ElectricityNet [J]
+
+ Meters for 1063,Site:Environmental Impact Total N2O Emissions Carbon Equivalent Mass [kg]
+  OnMeter=Carbon Equivalent:Facility [kg]
+  OnMeter=CarbonEquivalentEmissions:Carbon Equivalent [kg]
+
+ Meters for 1088,Site:Environmental Impact Total CH4 Emissions Carbon Equivalent Mass [kg]
+  OnMeter=Carbon Equivalent:Facility [kg]
+  OnMeter=CarbonEquivalentEmissions:Carbon Equivalent [kg]
+
+ Meters for 1089,Site:Environmental Impact Total CO2 Emissions Carbon Equivalent Mass [kg]
+  OnMeter=Carbon Equivalent:Facility [kg]
+  OnMeter=CarbonEquivalentEmissions:Carbon Equivalent [kg]
+
+ For Meter=Electricity:Facility [J], ResourceType=Electricity, contents are:
+  EXTERIOR-LIGHTS_UNIT1:Exterior Lights Electricity Energy
+  GARAGE-LIGHTS_UNIT1:Exterior Lights Electricity Energy
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=ExteriorLights:Electricity [J], ResourceType=Electricity, EndUse=ExteriorLights, contents are:
+  EXTERIOR-LIGHTS_UNIT1:Exterior Lights Electricity Energy
+  GARAGE-LIGHTS_UNIT1:Exterior Lights Electricity Energy
+
+ For Meter=Exterior-Lights:ExteriorLights:Electricity [J], ResourceType=Electricity, EndUse=ExteriorLights, contents are:
+  EXTERIOR-LIGHTS_UNIT1:Exterior Lights Electricity Energy
+
+ For Meter=Garage-Lights:ExteriorLights:Electricity [J], ResourceType=Electricity, EndUse=ExteriorLights, contents are:
+  GARAGE-LIGHTS_UNIT1:Exterior Lights Electricity Energy
+
+ For Meter=Electricity:Building [J], ResourceType=Electricity, Group=Building, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, Group=Zone, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, Group=SpaceType, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=InteriorLights:Electricity [J], ResourceType=Electricity, EndUse=InteriorLights, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+
+ For Meter=InteriorLights:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorLights, Group=Zone, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+
+ For Meter=InteriorLights:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorLights, Group=SpaceType, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+
+ For Meter=General:InteriorLights:Electricity [J], ResourceType=Electricity, EndUse=InteriorLights, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+
+ For Meter=General:InteriorLights:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorLights, Group=Zone, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+
+ For Meter=General:InteriorLights:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorLights, Group=SpaceType, contents are:
+  LIVING HARDWIRED LIGHTING1:Lights Electricity Energy
+  LIVING PLUG-IN LIGHTING1:Lights Electricity Energy
+
+ For Meter=InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  DISHWASHER1:Electric Equipment Electricity Energy
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+  TELEVISION1:Electric Equipment Electricity Energy
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=dishwasher:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  DISHWASHER1:Electric Equipment Electricity Energy
+
+ For Meter=dishwasher:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  DISHWASHER1:Electric Equipment Electricity Energy
+
+ For Meter=dishwasher:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  DISHWASHER1:Electric Equipment Electricity Energy
+
+ For Meter=refrigerator:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+
+ For Meter=refrigerator:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+
+ For Meter=refrigerator:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  REFRIGERATOR1:Electric Equipment Electricity Energy
+
+ For Meter=clotheswasher:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+
+ For Meter=clotheswasher:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+
+ For Meter=clotheswasher:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  CLOTHESWASHER1:Electric Equipment Electricity Energy
+
+ For Meter=electric_dryer:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+
+ For Meter=electric_dryer:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+
+ For Meter=electric_dryer:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  ELECTRIC_DRYER1:Electric Equipment Electricity Energy
+
+ For Meter=electric_range:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+
+ For Meter=electric_range:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+
+ For Meter=electric_range:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  ELECTRIC_RANGE1:Electric Equipment Electricity Energy
+
+ For Meter=television:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  TELEVISION1:Electric Equipment Electricity Energy
+
+ For Meter=television:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  TELEVISION1:Electric Equipment Electricity Energy
+
+ For Meter=television:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  TELEVISION1:Electric Equipment Electricity Energy
+
+ For Meter=electric_mels:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+
+ For Meter=electric_mels:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+
+ For Meter=electric_mels:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  ELECTRIC_MELS1:Electric Equipment Electricity Energy
+
+ For Meter=IECC_adj:InteriorEquipment:Electricity [J], ResourceType=Electricity, EndUse=InteriorEquipment, contents are:
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=IECC_adj:InteriorEquipment:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=Zone, contents are:
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=IECC_adj:InteriorEquipment:Electricity:SpaceType:GENERAL [J], ResourceType=Electricity, EndUse=InteriorEquipment, Group=SpaceType, contents are:
+  IECC_ADJ1:Electric Equipment Electricity Energy
+
+ For Meter=Fans:Electricity [J], ResourceType=Electricity, EndUse=Fans, contents are:
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=Fans:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=Fans, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=Ventilation (simple):Fans:Electricity [J], ResourceType=Electricity, EndUse=Fans, contents are:
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=Ventilation (simple):Fans:Electricity:Zone:LIVING_UNIT1 [J], ResourceType=Electricity, EndUse=Fans, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Ventilation Fan Electricity Energy
+
+ For Meter=EnergyTransfer:Facility [J], ResourceType=EnergyTransfer, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=EnergyTransfer:Building [J], ResourceType=EnergyTransfer, Group=Building, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=EnergyTransfer:Zone:LIVING_UNIT1 [J], ResourceType=EnergyTransfer, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=Heating:EnergyTransfer [J], ResourceType=EnergyTransfer, EndUse=Heating, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=Heating:EnergyTransfer:Zone:LIVING_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Heating, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=General:Heating:EnergyTransfer [J], ResourceType=EnergyTransfer, EndUse=Heating, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=General:Heating:EnergyTransfer:Zone:LIVING_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Heating, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=Cooling:EnergyTransfer [J], ResourceType=EnergyTransfer, EndUse=Cooling, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=Cooling:EnergyTransfer:Zone:LIVING_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Cooling, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=General:Cooling:EnergyTransfer [J], ResourceType=EnergyTransfer, EndUse=Cooling, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=General:Cooling:EnergyTransfer:Zone:LIVING_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Cooling, Group=Zone, contents are:
+  LIVING_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=EnergyTransfer:Zone:ATTIC_UNIT1 [J], ResourceType=EnergyTransfer, Group=Zone, contents are:
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=Heating:EnergyTransfer:Zone:ATTIC_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Heating, Group=Zone, contents are:
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=General:Heating:EnergyTransfer:Zone:ATTIC_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Heating, Group=Zone, contents are:
+  ATTIC_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=Cooling:EnergyTransfer:Zone:ATTIC_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Cooling, Group=Zone, contents are:
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=General:Cooling:EnergyTransfer:Zone:ATTIC_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Cooling, Group=Zone, contents are:
+  ATTIC_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J], ResourceType=EnergyTransfer, Group=Zone, contents are:
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=Heating:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Heating, Group=Zone, contents are:
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=General:Heating:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Heating, Group=Zone, contents are:
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Heating Energy
+
+ For Meter=Cooling:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Cooling, Group=Zone, contents are:
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=General:Cooling:EnergyTransfer:Zone:CRAWLSPACE_UNIT1 [J], ResourceType=EnergyTransfer, EndUse=Cooling, Group=Zone, contents are:
+  CRAWLSPACE_UNIT1:Zone Air System Sensible Cooling Energy
+
+ For Meter=DistrictHeating:Facility [J], ResourceType=DistrictHeating, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Heating Energy
+
+ For Meter=DistrictHeating:HVAC [J], ResourceType=DistrictHeating, Group=HVAC, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Heating Energy
+
+ For Meter=Heating:DistrictHeating [J], ResourceType=DistrictHeating, EndUse=Heating, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Heating Energy
+
+ For Meter=General:Heating:DistrictHeating [J], ResourceType=DistrictHeating, EndUse=Heating, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Heating Energy
+
+ For Meter=DistrictCooling:Facility [J], ResourceType=DistrictCooling, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Cooling Energy
+
+ For Meter=DistrictCooling:HVAC [J], ResourceType=DistrictCooling, Group=HVAC, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Cooling Energy
+
+ For Meter=Cooling:DistrictCooling [J], ResourceType=DistrictCooling, EndUse=Cooling, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Cooling Energy
+
+ For Meter=General:Cooling:DistrictCooling [J], ResourceType=DistrictCooling, EndUse=Cooling, contents are:
+  LIVING_UNIT1 IDEAL LOADS AIR SYSTEM:Zone Ideal Loads Supply Air Total Cooling Energy
+
+ For Meter=ElectricityPurchased:Facility [J], ResourceType=ElectricityPurchased, contents are:
+  Whole Building:Facility Total Purchased Electricity Energy
+
+ For Meter=ElectricityPurchased:Plant [J], ResourceType=ElectricityPurchased, Group=Plant, contents are:
+  Whole Building:Facility Total Purchased Electricity Energy
+
+ For Meter=Cogeneration:ElectricityPurchased [J], ResourceType=ElectricityPurchased, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Total Purchased Electricity Energy
+
+ For Meter=General:Cogeneration:ElectricityPurchased [J], ResourceType=ElectricityPurchased, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Total Purchased Electricity Energy
+
+ For Meter=ElectricitySurplusSold:Facility [J], ResourceType=ElectricitySurplusSold, contents are:
+  Whole Building:Facility Total Surplus Electricity Energy
+
+ For Meter=ElectricitySurplusSold:Plant [J], ResourceType=ElectricitySurplusSold, Group=Plant, contents are:
+  Whole Building:Facility Total Surplus Electricity Energy
+
+ For Meter=Cogeneration:ElectricitySurplusSold [J], ResourceType=ElectricitySurplusSold, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Total Surplus Electricity Energy
+
+ For Meter=General:Cogeneration:ElectricitySurplusSold [J], ResourceType=ElectricitySurplusSold, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Total Surplus Electricity Energy
+
+ For Meter=ElectricityNet:Facility [J], ResourceType=ElectricityNet, contents are:
+  Whole Building:Facility Net Purchased Electricity Energy
+
+ For Meter=ElectricityNet:Plant [J], ResourceType=ElectricityNet, Group=Plant, contents are:
+  Whole Building:Facility Net Purchased Electricity Energy
+
+ For Meter=Cogeneration:ElectricityNet [J], ResourceType=ElectricityNet, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Net Purchased Electricity Energy
+
+ For Meter=General:Cogeneration:ElectricityNet [J], ResourceType=ElectricityNet, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Net Purchased Electricity Energy
+
+ For Meter=Carbon Equivalent:Facility [kg], ResourceType=Carbon Equivalent, contents are:
+  Site:Environmental Impact Total N2O Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CH4 Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CO2 Emissions Carbon Equivalent Mass
+
+ For Meter=CarbonEquivalentEmissions:Carbon Equivalent [kg], ResourceType=Carbon Equivalent, EndUse=CarbonEquivalentEmissions, contents are:
+  Site:Environmental Impact Total N2O Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CH4 Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CO2 Emissions Carbon Equivalent Mass
