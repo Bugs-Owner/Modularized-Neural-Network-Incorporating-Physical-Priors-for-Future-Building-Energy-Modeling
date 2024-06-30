@@ -11,7 +11,6 @@ More detailed infomation coming soon, I will try to update at least once a week.
 
 ## Related publications
 
-I hope it can come soon...
 
 ## Contact
 Pleasae send me email: zjiang19@syr.edu if you have any questions. Thank you~
