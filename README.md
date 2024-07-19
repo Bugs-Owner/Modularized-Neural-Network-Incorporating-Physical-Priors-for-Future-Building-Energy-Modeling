@@ -21,6 +21,12 @@ We introduce physical consistency constraints to ensure the model responds appro
    
 We connect different modules based on physical typology, allowing for multiple-building applications through model sharing and inheritance.
 
+## Instruction: 
+Step 1: Change your dataset to fit the column name
+Step 2: Run run.py file
+
+Yes, only two steps. More detailed information coming soon~
+
 ## Publication: 
 Zixin Jiang, Bing Dong,
 Modularized neural network incorporating physical priors for future building energy modeling,
