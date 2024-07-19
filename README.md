@@ -6,15 +6,19 @@ This repository proposed a modularized neural network incorporating physical pri
 The incorporation of physical knowledge can be summarized in four key points: 
 
 1) Heat Balance-Inspired Modularization
+   
 We incorporated physical knowledge by modularizing the model structures to create a heat balance framework. Specifically, we developed distinct neural network modules to estimate each unique heat transfer term of the dynamic building system.
 
 2) State-Space-Inspired Encoder-Decoder Structure
+   
 An encoder is designed to extract historical information, a current cell measures data from the current time step, and a decoder predicts system responses based on future system inputs and disturbances.
 
 3) Physically Consistent Model Constraints
+   
 We introduce physical consistency constraints to ensure the model responds appropriately to given inputs. For example, the conduction heat flux through a wall decreases as the R-value increases, and indoor air temperature decreases with an increasing HVAC cooling load.
 
 4) Lego Brick-Inspired Modular Design
+   
 We connect different modules based on physical typology, allowing for multiple-building applications through model sharing and inheritance.
 
 ## Publication: 
