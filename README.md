@@ -17,6 +17,7 @@ We introduce physical consistency constraints to ensure the model responds appro
 4) Lego Brick-Inspired Modular Design
 We connect different modules based on physical typology, allowing for multiple-building applications through model sharing and inheritance.
 
-
+## Publication: 
+https://www.cell.com/patterns/fulltext/S2666-3899(24)00162-4
 ## Contact
 Please send me an email: zjiang19@syr.edu if you have any questions. Thank you~
