@@ -21,6 +21,7 @@ The incorporation of physical knowledge can be summarized in four key points:
 1) Heat Balance-Inspired Modularization
    
 We incorporated physical knowledge by modularizing the model structures to create a heat balance framework. Specifically, we developed distinct neural network modules to estimate each unique heat transfer term of the dynamic building system.
+![gr1_lrg](https://github.com/user-attachments/assets/6b941d58-bcee-4de7-ab24-af456ae48ce4)
 
 2) State-Space-Inspired Encoder-Decoder Structure
    
