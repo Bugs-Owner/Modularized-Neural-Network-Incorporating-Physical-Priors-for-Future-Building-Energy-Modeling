@@ -23,9 +23,12 @@ We connect different modules based on physical typology, allowing for multiple-b
 
 ## Instruction: 
 Step 1: Change your dataset to fit the column name
+
 Step 2: Run run.py file
 
-Yes, only two steps. More detailed information coming soon~
+![ModNN](https://github.com/user-attachments/assets/bc144fbd-bff0-4988-ae2b-5f7c1a991480)
+
+Yes, you only need two steps. More detailed information coming soon~
 
 ## Publication: 
 Zixin Jiang, Bing Dong,
