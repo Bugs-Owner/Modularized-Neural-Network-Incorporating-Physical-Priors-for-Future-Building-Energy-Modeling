@@ -18,6 +18,10 @@ We introduce physical consistency constraints to ensure the model responds appro
 We connect different modules based on physical typology, allowing for multiple-building applications through model sharing and inheritance.
 
 ## Publication: 
-https://www.cell.com/patterns/fulltext/S2666-3899(24)00162-4
+Zixin Jiang, Bing Dong,
+Modularized neural network incorporating physical priors for future building energy modeling,
+Patterns,2024,101029, ISSN 2666-3899,
+https://doi.org/10.1016/j.patter.2024.101029.
+
 ## Contact
 Please send me an email: zjiang19@syr.edu if you have any questions. Thank you~
