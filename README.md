@@ -1,5 +1,8 @@
 # Modularized Neural Network Incorporating Physical Priors for Future Building Energy Modeling
 
+![fx1_lrg](https://github.com/user-attachments/assets/c82ea76a-494a-4c2b-a593-0cc729a97d36)
+
+
 This repository proposed a modularized neural network incorporating physical priors (ModNN) for Future Building Energy Modeling, which can be used for 1) load prediction, 2) dynamic modeling, 3) retrofit, and 4) energy optimization. 
 The incorporation of physical knowledge can be summarized in four key points: 
 
