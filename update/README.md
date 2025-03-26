@@ -8,14 +8,15 @@ It incorporates with physics-informed model structure, loss function, and model 
 
 ## 🚀 Installation
 
-You can install the package using pip very easy:
+You can install the package using pip:
 
 pip install modnn
 
 
 
 ## 🧠 Example
-Please find the online Jupyter notebook for a step-by-step instruction
+Please find the online Jupyter notebook for a step-by-step instruction:
+https://colab.research.google.com/drive/1A2jt1q53RtxGuaoym6N1PmlKELDPpYFX?usp=sharing
 
 
 ## 🧪 Requirements
