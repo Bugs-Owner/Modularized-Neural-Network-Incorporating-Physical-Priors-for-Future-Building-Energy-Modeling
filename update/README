@@ -1,0 +1,87 @@
+# ModNN
+
+**ModNN** is a Modularized Physics-Informed Neural Network for building energy modeling.
+It incorporates with physics-informed model structure, loss function, and model constraints.
+
+---
+
+## 🚀 Installation
+
+You can install the package using pip:
+pip install ModNN
+Or install locally by git clone
+
+
+## 🧠 Example Usage
+Please check the example file
+
+Call print_help() for a list of available arguments:
+from ModNN.config import print_help
+print_help()
+
+🧪 Requirements
+
+    Python 3.7+
+
+    PyTorch
+
+    NumPy
+
+    Pandas
+
+    Matplotlib
+
+    Seaborn
+
+    scikit-learn
+
+    tqdm
+
+Install requirements with:
+
+pip install -r requirements.txt
+
+📁 Folder Structure
+
+ModNN/
+├── Config.py
+├── Dataset.py
+├── utils.py
+├── Play.py
+├── run.py
+├── Models/
+│   ├── ModNN.py
+│   └── BaseNN.py
+Examples/
+├── Example.py
+
+📊 Input Data Format
+
+The model expects a time-indexed CSV file with the following columns:
+Column Name	Description	Example Values
+temp_room	Measured room/zone temperature [°F]	72.1, 73.4
+temp_amb	Ambient/outdoor air temperature [°F]	80.5, 79.2
+solar	Solar radiation [W/m²]	120.5, 340.1
+occ	Occupancy schedule (0–1 or number of occupants)	0, 1, 0.5
+phvac	HVAC power input (heating/cooling) [W]	-3000, 0, 2000
+
+Additionally:
+
+    The index of the CSV must be a datetime format like "MM/DD/YYYY HH:MM" or "YYYY-MM-DD HH:MM:SS".
+
+    day_sin and day_cos (time-of-day sinusoidal features) will be added automatically by the system.
+
+    All features are automatically scaled using MinMaxScaler to the range [-1, 1], and for phvac, you can use a custom scale if you want.
+
+📬 License
+
+MIT License
+🙋‍♂️ Author
+
+Zixin Jiang
+zjiang19@syr.edu
+
+
+---
+
+Let me know if you'd like a version with **badges**, **links to docs**, or **publicati
