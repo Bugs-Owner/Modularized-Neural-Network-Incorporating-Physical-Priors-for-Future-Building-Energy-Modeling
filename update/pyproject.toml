@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "modnn"
+version = "1.0.0"
+description = "Physics-Informed Modularized Neural Network for Building Energy Modeling"
+readme = "README.md"
+requires-python = ">=3.7"
+authors = [
+  { name="Zixin Jiang", email="zjiang19@syr.edu" }
+]
+license = "MIT"
+
+dependencies = [
+  "numpy",
+  "torch",
+  "pandas",
+  "matplotlib",
+  "seaborn",
+  "scikit-learn",
+  "tqdm"
+]
+
+[tool.setuptools.packages.find]
+include = ["modnn"]

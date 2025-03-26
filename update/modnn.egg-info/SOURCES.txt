@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+modnn/Config.py
+modnn/Dataset.py
+modnn/Play.py
+modnn/__init__.py
+modnn/run.py
+modnn/utils.py
+modnn.egg-info/PKG-INFO
+modnn.egg-info/SOURCES.txt
+modnn.egg-info/dependency_links.txt
+modnn.egg-info/requires.txt
+modnn.egg-info/top_level.txt
