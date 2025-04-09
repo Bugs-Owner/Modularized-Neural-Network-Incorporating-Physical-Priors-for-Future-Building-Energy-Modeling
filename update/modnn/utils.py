@@ -279,8 +279,8 @@ class Mod:
         # ax.xaxis.set_major_locator(dates.DayLocator(interval=1))
         # ax.xaxis.set_major_formatter(dates.DateFormatter('%b\n%d'))
         ax.set_xlabel(None)
-        ax.set_ylim(21,27)
-        ax.set_yticks(range(22,28,2))
+        # ax.set_ylim(21,27)
+        # ax.set_yticks(range(22,28,2))
         ax.set_ylabel('Temperature[°C]', fontsize=7, fontweight='bold')
         ax.margins(x=0)
         ax.legend(loc='center', bbox_to_anchor=(0.5, 1.06), ncol=2, fontsize=7, frameon=False)
@@ -342,8 +342,8 @@ class Mod:
         axes[1].xaxis.set_minor_formatter(dates.DateFormatter('%H:%M'))
         axes[1].xaxis.set_major_locator(dates.DayLocator(interval=1))
         axes[1].xaxis.set_major_formatter(dates.DateFormatter('%b%d'))
-        axes[0].set_yticks(np.arange(22, 32, 2))
-        axes[0].set_ylim(21, 31.8)
+        # axes[0].set_yticks(np.arange(22, 32, 2))
+        # axes[0].set_ylim(21, 31.8)
         axes[0].set_xlabel(None)
         axes[0].set_ylabel('Temperature[°C]', fontsize=9)
         axes[1].set_ylabel('HVAC Power[kW]', fontsize=9)
@@ -414,8 +414,8 @@ class Mod:
         ax.set_xlabel(None)
         ax.set_ylabel('Temperature[°C]', fontsize=9)
         ax.margins(x=0)
-        ax.set_yticks(np.arange(20, 40, 4))
-        ax.set_ylim(18, 40)
+        # ax.set_yticks(np.arange(20, 40, 4))
+        # ax.set_ylim(18, 40)
         plt.show()
 
     def overall_show(self):
@@ -486,8 +486,8 @@ class Mod:
         ax.set_xlabel(None)
         ax.set_ylabel('Temperature[°C]', fontsize=9)
         ax.margins(x=0)
-        ax.set_yticks(np.arange(8, 32, 5))
-        ax.set_ylim(10, 30)
+        # ax.set_yticks(np.arange(8, 32, 5))
+        # ax.set_ylim(10, 30)
         plt.close()
         folder = '../Saved/Overall'
         if not os.path.exists(folder):

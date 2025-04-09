@@ -12,3 +12,6 @@ modnn.egg-info/SOURCES.txt
 modnn.egg-info/dependency_links.txt
 modnn.egg-info/requires.txt
 modnn.egg-info/top_level.txt
+modnn/Models/BaseNN.py
+modnn/Models/ModNN.py
+modnn/Models/__init__.py
