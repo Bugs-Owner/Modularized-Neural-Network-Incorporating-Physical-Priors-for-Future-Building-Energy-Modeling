@@ -5,10 +5,10 @@ def _paras(**kwargs):
     """
     para = {
         # Internal gain module
-        "Int_in": 3, "Int_h": 18, "Int_out": 1,
+        "Int_in": 3, "Int_h": 9, "Int_out": 1,
 
         # External disturbance module
-        "Ext_in": 5, "Ext_h": 22, "Ext_out": 1,
+        "Ext_in": 3, "Ext_h": 18, "Ext_out": 1,
 
         # Zone module
         "Zone_in": 1, "Zone_out": 1,
@@ -17,11 +17,11 @@ def _paras(**kwargs):
         "HVAC_in": 1, "HVAC_out": 1,
 
         # Look back window
-        "window" : 1,
+        "window" : 4,
 
         # Training hyperparameters
         "lr": 0.01,
-        "epochs": 500,
+        "epochs": 200,
         "patience": 10, #Early stop
     }
 
@@ -41,18 +41,18 @@ def _args(**kwargs):
         "para": _paras(**para_overrides),
 
         # Paths and device
-        "datapath": "../Dataset/EPlus.csv",
+        "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_AC_off_2month.csv",#"../Dataset/EPlus.csv",
         "device": "cuda:1",
 
         # Data settings
         "resolution": 15, # 15 minutes data
         "enLen": 48, # "Kind of warm-up"
         "deLen": 96, # Prediction horizon, 96 is for 24 hours
-        "startday": 60, # Training data selection
-        "trainday": 90, # Training data selection
+        "startday": 31, # Training data selection
+        "trainday": 180, # Training data selection
         "testday": 1, # Testing data selection
         "training_batch": 1024,
-        "plott": 'all', # all: If want to see how model response to max heating/cooling; else: only Tzone prediction
+        "plott": '-all', # all: If want to see how model response to max heating/cooling; else: only Tzone prediction
         "modeltype": 'PI-modnn', # We also have "LSTM", "PI-modnn", "PI-modnn|C", "PI-modnn|L", "PI-modnn|LC" for fun
                                  # LSTM is the baseline, |C means no constraints, |L means no loss adjustment
         "scale": 1, # scaling factor for HVAC power

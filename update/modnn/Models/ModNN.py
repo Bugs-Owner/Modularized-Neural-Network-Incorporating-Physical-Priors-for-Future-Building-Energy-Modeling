@@ -11,10 +11,10 @@ class zone(nn.Module):
     def __init__(self, input_size, output_size):
         super(zone, self).__init__()
         # Set bias to False here is important, since this module is learning a weight only (cm)
-        self.FC1 = nn.Linear(input_size, output_size, bias=False)
+        self.FC = nn.Linear(input_size, output_size, bias=False)
 
     def forward(self, x):
-        return self.FC1(x)
+        return self.FC(x)
 
 # --- Internal Gain Module ---
 class internal(nn.Module):
@@ -37,18 +37,19 @@ class internal(nn.Module):
     """
     def __init__(self, input_size, hidden_size, output_size):
         super(internal, self).__init__()
-        self.FC1 = nn.Linear(input_size, hidden_size)
-        self.FC2 = nn.Linear(hidden_size, hidden_size)
-        self.FC3 = nn.Linear(hidden_size, output_size)
+        self.FC1 = nn.Linear(input_size-1, hidden_size)
+        self.FC2 = nn.Linear(hidden_size, output_size)
         self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
+        self.tanh = nn.Tanh()
         self.scale = nn.Linear(output_size, output_size, bias=False)
 
     def forward(self, x):
-        x = self.relu(self.FC1(x))
-        # x = self.relu(self.FC2(x))
-        x = self.sigmoid(self.FC3(x))  # Use sigmoid to bound the output within 0 to 1, kind of norm them as a "schedule"
-        return self.scale(x)
+        embedding = self.FC1(x[:, :, :-1])
+        embedding = self.relu(embedding)
+        embedding = self.FC2(embedding)
+        embedding = self.tanh(embedding)
+        embedding = embedding + x[:, :, -1:]
+        return self.scale(embedding)
 
 # --- HVAC Module ---
 class hvac(nn.Module):
@@ -62,33 +63,35 @@ class hvac(nn.Module):
     """
     def __init__(self, input_size, output_size):
         super(hvac, self).__init__()
-        self.FC1 = nn.Linear(input_size, output_size, bias=False)
+        self.FC = nn.Linear(input_size, output_size, bias=False)
 
     def forward(self, x):
-        return self.FC1(x)
+        return self.FC(x)
 
 # --- External Disturbance Module ---
 class external(nn.Module):
     """
-    We use a LSTM to calculate the external disturbance
-    It can switch to any type of RNN or add look back window for MLP to consider solar radiation
+    We use RNN to calculate the external disturbance
+    Because it can apply positive constraint easy
+    GRU/LSTM has hadamard product, making this constraint diffucult
+    However, for disturbance prediction,the training always have similiar distribution
+    In this case, do we necessarily need this constraint?
 
     This module is learning the heat transfer through envelop, including conduction, convection and radiation
     And can be seperated into different sub-modules, please select case by case
     """
     def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(external, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=num_layers, batch_first=True)
-        self.fc1 = nn.Linear(hidden_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers=num_layers, batch_first=True)
+        self.FC = nn.Linear(hidden_size, output_size)
         self.relu = nn.ReLU()
 
     def forward(self, x_input, hidden_state):
-        lstm_out, hidden = self.lstm(x_input, hidden_state)
-        last_output = lstm_out[:, -1:, :]
-        out = self.relu(self.fc1(last_output))
-        out = self.fc2(out)
-        return out, hidden
+        rnn_out, hidden = self.rnn(x_input, hidden_state)
+        last_output = rnn_out[:, [-1], :]
+        output = self.FC(last_output)
+
+        return output, hidden
 
 # --- Modular Physics-Informed Neural Network ---
 class ModNN(nn.Module):
@@ -112,7 +115,7 @@ class ModNN(nn.Module):
         input_X order: [T_zone, T_ambient, solar, day_sin, day_cos, occ, phvac]
         Shape: [batch_size, time_steps, features]
         """
-        Ext_X = input_X[:, :, [1, 2, 3, 4]]  # Ambient, Solar, Sin/Cos
+        Ext_X = input_X[:, :, [1, 2]]  # Ambient, Solar, Sin/Cos
         Int_X = input_X[:, :, [3, 4, 5]]     # Sin/Cos + Occupancy
         HVAC_X = input_X[:, :, [6]]          # HVAC power input
 
@@ -123,8 +126,7 @@ class ModNN(nn.Module):
         Int_list = torch.zeros_like(HVAC_X).to(self.device)
 
         # Initialize encoder hidden states
-        h_ext = torch.ones(1, input_X.shape[0], self.Ext.lstm.hidden_size).to(self.device)
-        c_ext = torch.ones(1, input_X.shape[0], self.Ext.lstm.hidden_size).to(self.device)
+        ext_hidd = torch.ones(1, input_X.shape[0], self.Ext.rnn.hidden_size).to(self.device)
 
         # This is the look back window
         # I strongly suggest to use it, if you are using MLP external module
@@ -160,7 +162,7 @@ class ModNN(nn.Module):
                 Ext_X[:, i-window_size+1:i+1, :]
             ], dim=2)
 
-            ext_flux, (h_ext, c_ext) = self.Ext(ext_embed, (h_ext, c_ext))
+            ext_flux, ext_hidd = self.Ext(ext_embed, ext_hidd)
             hvac_flux = HVAC_X[:, i:i+1, :]
             # The internal heat gain module used here Did Not consider Tzone
             # But actually, the heat transfer factor is Tzone dependant
@@ -185,7 +187,7 @@ class ModNN(nn.Module):
                 Ext_X[:, i-window_size+1:i+1, :]
             ], dim=2)
 
-            ext_flux, (h_ext, c_ext) = self.Ext(dec_embed, (h_ext, c_ext))
+            ext_flux, ext_hidd = self.Ext(dec_embed, ext_hidd)
             hvac_flux = HVAC_X[:, i:i+1, :]
             int_flux = self.Int(Int_X[:, i:i+1, :])
 

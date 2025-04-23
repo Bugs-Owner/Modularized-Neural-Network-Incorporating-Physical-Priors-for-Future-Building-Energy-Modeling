@@ -119,7 +119,7 @@ class Mod:
         axins.plot(self.loss_dic['valid_losses'], label='Validation loss', color='#8B90F5')
 
         # Specify the limits of your zoom-in area
-        # x1, x2, y1, y2 = 50, 120, 0.001, 0.008  # These limits should be set according to your data
+        # x1, x2, y1, y2 = 50, 120, 0.001, 0.008
         # axins.set_xlim(x1, x2)
         # axins.set_ylim(y1, y2)
 

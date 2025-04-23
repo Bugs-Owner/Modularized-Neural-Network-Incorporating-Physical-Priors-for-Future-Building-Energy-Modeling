@@ -118,9 +118,11 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 if Phy_cons==1:
                     try:
                         # Positive Hard Constraints
-                        model.Zone.FC1.weight.data.clamp_(0)
-                        model.HVAC.FC1.weight.data.clamp_(0)
+                        model.Zone.FC.weight.data.clamp_(0)
+                        model.HVAC.FC.weight.data.clamp_(0)
                         model.Int.scale.weight.data.clamp_(0)
+                        model.Ext.FC.weight.data.clamp_(0)
+                        model.Ext.rnn.weight.data.clamp_(0)
                     except:
                         pass
 
