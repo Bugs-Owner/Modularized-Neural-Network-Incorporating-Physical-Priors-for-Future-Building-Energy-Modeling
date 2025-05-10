@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 # --- Zone Module ---
 class zone(nn.Module):
@@ -11,10 +12,10 @@ class zone(nn.Module):
     def __init__(self, input_size, output_size):
         super(zone, self).__init__()
         # Set bias to False here is important, since this module is learning a weight only (cm)
-        self.FC = nn.Linear(input_size, output_size, bias=False)
+        self.scale = nn.Linear(input_size, output_size, bias=False)
 
     def forward(self, x):
-        return self.FC(x)
+        return self.scale(x)
 
 # --- Internal Gain Module ---
 class internal(nn.Module):
@@ -39,15 +40,15 @@ class internal(nn.Module):
         super(internal, self).__init__()
         self.FC1 = nn.Linear(input_size-1, hidden_size)
         self.FC2 = nn.Linear(hidden_size, output_size)
+        self.scale = nn.Linear(1, 1, bias=False)
         self.relu = nn.ReLU()
-        self.tanh = nn.Tanh()
-        self.scale = nn.Linear(output_size, output_size, bias=False)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         embedding = self.FC1(x[:, :, :-1])
         embedding = self.relu(embedding)
         embedding = self.FC2(embedding)
-        embedding = self.tanh(embedding)
+        embedding = self.sigmoid(embedding) #Force output to 0--1
         embedding = embedding + x[:, :, -1:]
         return self.scale(embedding)
 
@@ -63,33 +64,75 @@ class hvac(nn.Module):
     """
     def __init__(self, input_size, output_size):
         super(hvac, self).__init__()
-        self.FC = nn.Linear(input_size, output_size, bias=False)
+        self.scale = nn.Linear(input_size, output_size, bias=False)
 
     def forward(self, x):
-        return self.FC(x)
+        return self.scale(x)
 
 # --- External Disturbance Module ---
 class external(nn.Module):
     """
-    We use RNN to calculate the external disturbance
-    Because it can apply positive constraint easy
-    GRU/LSTM has hadamard product, making this constraint diffucult
-    However, for disturbance prediction,the training always have similiar distribution
-    In this case, do we necessarily need this constraint?
+    We use RNN to calculate the external disturbance.
+    RNN allows easy positive constraints compared to GRU/LSTM.
+    For disturbance prediction, similar distributions exist during training,
+    so strict constraints may not be necessary.
 
-    This module is learning the heat transfer through envelop, including conduction, convection and radiation
-    And can be seperated into different sub-modules, please select case by case
+    This module learns heat transfer through the envelope, including conduction, convection, and radiation,
+    and can be separated into different sub-modules (choose case by case).
     """
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
+    def __init__(self, input_size, hidden_size, output_size, model_type, window_size, num_layers=1):
         super(external, self).__init__()
-        self.rnn = nn.RNN(input_size, hidden_size, num_layers=num_layers, batch_first=True)
-        self.FC = nn.Linear(hidden_size, output_size)
+        self.timeFC1 = nn.Linear(in_features=2, out_features=2, bias=True)
+        self.timeFC2 = nn.Linear(in_features=2, out_features=1, bias=True)
+
+        self.trans_coeff = nn.Parameter(torch.rand(1))
+        self.absor_coeff = nn.Parameter(torch.rand(1))
+
+        self.FC = nn.Linear(in_features=hidden_size, out_features=1, bias=True)
+        self.tran_FC = nn.Linear(in_features=window_size, out_features=1, bias=True)
+        self.conduction = nn.Linear(1, 1, bias=False)
         self.relu = nn.ReLU()
 
+        if model_type == "RNN":
+            self.ext_mdl = nn.RNN(input_size=output_size, hidden_size=hidden_size,
+                                  num_layers=num_layers, batch_first=True, bias=True)
+        elif model_type == "LSTM":
+            self.ext_mdl = nn.LSTM(input_size=output_size, hidden_size=hidden_size,
+                                   num_layers=num_layers, batch_first=True, bias=True)
+        else:
+            raise ValueError("Module error, please choose 'RNN' or 'LSTM'.")
+
     def forward(self, x_input, hidden_state):
-        rnn_out, hidden = self.rnn(x_input, hidden_state)
-        last_output = rnn_out[:, [-1], :]
-        output = self.FC(last_output)
+        # Structure of x_input
+        # Room[0], Ambient[1], Solar[2], Sin/Cos[3,4]
+        # Solar radiation adjustment
+        # For each surface, the radiation is time related due to solar angle
+        # So we learn a time feature first
+        time_depend_scale = self.timeFC1(x_input[:, :, [3, 4]])
+        time_depend_scale = self.relu(time_depend_scale)
+        time_depend_scale = self.relu(self.timeFC2(time_depend_scale))
+        adj_sol = x_input[:, :, [2]]
+
+        # Transmittance and Absorptance coefficients
+        # Some solar absorbed by ext surfaces, some transmit into space directly
+        trans_coeff = torch.sigmoid(self.trans_coeff)
+        absor_coeff = torch.sigmoid(self.absor_coeff)
+
+        # Solar transmission and absorption
+        trans_sol = trans_coeff * adj_sol
+        absor_sol = absor_coeff * adj_sol
+
+        # "Conduction, T_amb-T_room", (actually this process include convection, conduction and radiation)
+        temp_diff = x_input[:, :, [1]] - x_input[:, :, [0]]
+        q_con = self.conduction(temp_diff)
+
+        # External model
+        # Heat through opeque envelop
+        ext_input = absor_sol + q_con
+        out, hidden = self.ext_mdl(ext_input, hidden_state)
+        last_output = out[:, [-1], :]
+        # Final gain need to plus the heat through transparent envelop
+        output = self.FC(last_output) + trans_sol[:, [-1], :]
 
         return output, hidden
 
@@ -102,10 +145,11 @@ class ModNN(nn.Module):
         super(ModNN, self).__init__()
         para = args["para"]
         self.encoLen = args["enLen"]
-        self.device = args['device']
-        self.window = para["window"]
+        self.device  = args['device']
+        self.window  = para["window"]
+        self.ext_mdl = args["ext_mdl"]
 
-        self.Ext = external(para["Ext_in"], para["Ext_h"], para["Ext_out"])
+        self.Ext = external(para["Ext_in"], para["Ext_h"], para["Ext_out"], self.ext_mdl, para["window"])
         self.Zone = zone(para["Zone_in"], para["Zone_out"])
         self.HVAC = hvac(para["HVAC_in"], para["HVAC_out"])
         self.Int = internal(para["Int_in"], para["Int_h"], para["Int_out"])
@@ -115,7 +159,7 @@ class ModNN(nn.Module):
         input_X order: [T_zone, T_ambient, solar, day_sin, day_cos, occ, phvac]
         Shape: [batch_size, time_steps, features]
         """
-        Ext_X = input_X[:, :, [1, 2]]  # Ambient, Solar, Sin/Cos
+        Ext_X = input_X[:, :, [1, 2, 3, 4]]  # Ambient, Solar, Sin/Cos
         Int_X = input_X[:, :, [3, 4, 5]]     # Sin/Cos + Occupancy
         HVAC_X = input_X[:, :, [6]]          # HVAC power input
 
@@ -124,10 +168,13 @@ class ModNN(nn.Module):
         HVAC_list = torch.zeros_like(HVAC_X).to(self.device)
         Ext_list = torch.zeros_like(HVAC_X).to(self.device)
         Int_list = torch.zeros_like(HVAC_X).to(self.device)
-
+        deltaQ_list = torch.zeros_like(HVAC_X).to(self.device)
         # Initialize encoder hidden states
-        ext_hidd = torch.ones(1, input_X.shape[0], self.Ext.rnn.hidden_size).to(self.device)
-
+        if self.ext_mdl == "RNN":
+            ext_hidd = torch.ones(1, input_X.shape[0], self.Ext.ext_mdl.hidden_size).to(self.device)
+        else:
+            ext_hidd = torch.ones(1, Ext_X.shape[0], self.Ext.ext_mdl.hidden_size).to(self.device)
+            ext_cell = torch.ones(1, Ext_X.shape[0], self.Ext.ext_mdl.hidden_size).to(self.device)
         # This is the look back window
         # I strongly suggest to use it, if you are using MLP external module
         # The value if how long you want to look back, typically, larger value for heavy structures
@@ -151,51 +198,57 @@ class ModNN(nn.Module):
             # Which is calculated by previous input, and using a recursive way to get it
             # Therefore we might get accumulative error
 
-            # So we use mixed data (predicted Tzone and measured Tzone) in the training stage
-            # To speed up the learning convergency
-            # And gradully adapt to predicted only
-
-            ratio = i / self.encoLen
+            # To speed up the learning convergency,
+            # We use mixed data (predicted Tzone and measured Tzone) in the training stage
+            ratio = i/self.encoLen
             TOut_list[:, i, :] = E_Zone_T.squeeze(1)
             ext_embed = torch.cat([
                 input_X[:, i-window_size+1:i+1, [0]] * ratio + TOut_list[:, i-window_size+1:i+1, :] * (1 - ratio),
                 Ext_X[:, i-window_size+1:i+1, :]
             ], dim=2)
-
-            ext_flux, ext_hidd = self.Ext(ext_embed, ext_hidd)
-            hvac_flux = HVAC_X[:, i:i+1, :]
+            if self.ext_mdl == "RNN":
+                ext_flux, ext_hidd = self.Ext(ext_embed, ext_hidd)
+            else:
+                ext_flux, (ext_hidd, ext_cell) = self.Ext(ext_embed, (ext_hidd, ext_cell))
+            hvac_flux = self.HVAC(HVAC_X[:, i:i+1, :])
             # The internal heat gain module used here Did Not consider Tzone
             # But actually, the heat transfer factor is Tzone dependant
             # For a well controlled space, it's not important
             # But if you are interested in extreme case, please add Tzone for Int input
             int_flux = self.Int(Int_X[:, i:i+1, :])
-
             total_flux = ext_flux + hvac_flux + int_flux
             HVAC_list[:, i, :] = hvac_flux.squeeze(1)
             Ext_list[:, i, :] = ext_flux.squeeze(1)
             Int_list[:, i, :] = int_flux.squeeze(1)
+            deltaQ_list[:, i, :] = total_flux.squeeze(1)
 
             # After get total flux, we can predict the ΔTzone, and use residual connection to predict Tzone step by step
-            E_Zone_T = ratio * input_X[:, [[i]], [0]] + (1 - ratio) * E_Zone_T + self.Zone(total_flux)
+            E_Zone_T =  E_Zone_T + self.Zone(total_flux)
 
         # --- Decoding Phase ---
         # Just transfer encoder module here
         for i in range(self.encoLen, Ext_X.shape[1]):
             TOut_list[:, i, :] = E_Zone_T.squeeze(1)
-            dec_embed = torch.cat([
+            ext_embed = torch.cat([
                 TOut_list[:, i-window_size+1:i+1, :],
                 Ext_X[:, i-window_size+1:i+1, :]
             ], dim=2)
 
-            ext_flux, ext_hidd = self.Ext(dec_embed, ext_hidd)
-            hvac_flux = HVAC_X[:, i:i+1, :]
+            if self.ext_mdl == "RNN":
+                ext_flux, ext_hidd = self.Ext(ext_embed, ext_hidd)
+            else:
+                ext_flux, (ext_hidd, ext_cell) = self.Ext(ext_embed, (ext_hidd, ext_cell))
+            hvac_flux = self.HVAC(HVAC_X[:, i:i+1, :])
             int_flux = self.Int(Int_X[:, i:i+1, :])
-
             total_flux = ext_flux + hvac_flux + int_flux
+
             HVAC_list[:, i, :] = hvac_flux.squeeze(1)
             Ext_list[:, i, :] = ext_flux.squeeze(1)
             Int_list[:, i, :] = int_flux.squeeze(1)
+            deltaQ_list[:, i, :] = total_flux.squeeze(1)
             # No self-learning during decoder stage
-            E_Zone_T = self.Zone(total_flux) + E_Zone_T
+            E_Zone_T = E_Zone_T + self.Zone(total_flux)
 
-        return TOut_list, HVAC_list, (Ext_list, Int_list)
+        # Return not only temperature, but also latent flux
+        # Not sure how to use these fluxes right now, but leave for placeholder
+        return TOut_list, HVAC_list, (Ext_list, Int_list, deltaQ_list)

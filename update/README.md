@@ -19,6 +19,11 @@ Please find the online Jupyter notebook for a step-by-step instruction:
 https://colab.research.google.com/drive/1A2jt1q53RtxGuaoym6N1PmlKELDPpYFX?usp=sharing
 
 
+## 🧠 Update log
+To further improve physics consistency, 
+I replaced heattransfer module by energy balance equations, start from version 2.0.0
+
+
 ## 🧪 Requirements
 
     Python 3.7+

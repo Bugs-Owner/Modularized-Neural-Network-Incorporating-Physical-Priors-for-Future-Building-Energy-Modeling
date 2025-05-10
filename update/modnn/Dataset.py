@@ -69,10 +69,21 @@ class DataCook:
     - Slice into training/testing sequences
     - Create PyTorch DataLoaders
     """
+
     def __init__(self, args):
+        """
+        Args:
+            args (dict): Configuration arguments from config.py
+        """
         self.args = args
+        self.user_defined_minmax = args["user_defined_minmax"]
+        self.scaler_save_name = args["scaler_save_name"]
+        self.scaler_load = args["scaler_load"]
         self.df = None
         self.processed_data = None
+        self.scalers = None
+        folder_name = "../Scaler/{}".format(self.args['save_name'])
+        self.scaler_path = os.path.join(folder_name, self.scaler_save_name)
 
     def load_data(self):
         """Load raw CSV data and preprocess it."""
@@ -80,6 +91,11 @@ class DataCook:
         self._parse_time_index()
         self._generate_time_features()
         self._scale_features()
+
+    def load_scaler(self, path):
+        """Load scaler dictionary from pickle file."""
+        with open(path, "rb") as f:
+            self.scalers = pickle.load(f)
 
     def _parse_time_index(self):
         """Convert index to datetime format (auto-detect)."""
@@ -92,32 +108,76 @@ class DataCook:
                 raise ValueError("Unsupported datetime format in index.")
 
     def _generate_time_features(self):
-        """Add time-of-day features (sin and cos)."""
+        """Add normalized time-of-day features (sin and cos scaled to [0, 1], not [-1, 1] like people normally did)."""
         if "day_sin" not in self.df.columns:
             time_hours = self.df.index.hour + self.df.index.minute / 60
-            self.df["day_sin"] = np.sin(2 * np.pi * time_hours / 24)
-            self.df["day_cos"] = np.cos(2 * np.pi * time_hours / 24)
+            self.df["day_sin"] = np.sin(2 * np.pi * time_hours / 24) / 2 + 0.5
+            self.df["day_cos"] = np.cos(2 * np.pi * time_hours / 24) / 2 + 0.5
 
     def _scale_features(self):
         """Apply MinMax scaling to each feature and save scalers."""
         features = ["temp_room", "temp_amb", "solar", "occ", "phvac"]
-        scalers = {f: MinMaxScaler(feature_range=(-1, 1)) for f in features}
-        scalers["phvac"] = MinMaxScaler(feature_range=(-1*self.args["scale"], 1*self.args["scale"]))
-        scaled_data = [scalers[f].fit_transform(self.df[[f]]) for f in features]
 
-        # Save scalers for inference
-        os.makedirs("../Scaler", exist_ok=True)
-        with open("ModNN_scaler.pkl", "wb") as f:
-            pickle.dump(scalers, f)
+        # Load existing scaler if provided
+        if self.scaler_load:
+            self.load_scaler(self.scaler_path)
+            temp_scaler = self.scalers["temp"]
+            flux_scaler = self.scalers["flux"]
+        else:
+        # Or fit a new sacler
+            scalers = {}
+            # Temperature scaler
+            if self.user_defined_minmax["temp"]:
+                temp_min, temp_max = self.user_defined_minmax["temp"]
+                temp_scaler = MinMaxScaler(feature_range=(0, 1))
+                temp_scaler.fit(np.array([[temp_min], [temp_max]]))
+            else:
+                temp_scaler = MinMaxScaler(feature_range=(0, 1))
+                temp_scaler.fit(self.df[["temp_room", "temp_amb"]].values.flatten().reshape(-1, 1))
+            scalers["temp"] = temp_scaler
 
-        self.scalers = scalers
+            # Flux scaler
+            if self.user_defined_minmax["flux"]:
+                flux_min, flux_max = self.user_defined_minmax["flux"]
+                flux_scaler = MinMaxScaler(feature_range=(-1, 1))
+                flux_scaler.fit(np.array([[flux_min], [flux_max]]))
+            else:
+                flux_scaler = MinMaxScaler(feature_range=(-1, 1))
+                flux_scaler.fit(self.df[["phvac"]].values.flatten().reshape(-1, 1))
+            scalers["flux"] = flux_scaler
+
+            # Other feature scalers
+            for f in features:
+                if f in ["temp_room", "temp_amb", "phvac"]:
+                    continue
+                else:
+                    scalers[f] = MinMaxScaler(feature_range=(0, 1))
+                    scalers[f].fit(self.df[f].values.flatten().reshape(-1, 1))
+            self.scalers = scalers
+
+            # Save newly created scalers
+            folder_name = "../Scaler/{}".format(self.args['save_name'])
+            if not os.path.exists(folder_name):
+                os.makedirs(folder_name)
+            scaler_path = os.path.join(folder_name, self.scaler_save_name)
+            with open(scaler_path, "wb") as f:
+                pickle.dump(self.scalers, f)
+
+        # Transform using scalers
+        scaled_temp_room = self.scalers["temp"].transform(self.df[["temp_room"]].values)
+        scaled_temp_amb = self.scalers["temp"].transform(self.df[["temp_amb"]].values)
+        scaled_solar = self.scalers["solar"].transform(self.df[["solar"]].values)
+        scaled_phvac = self.scalers["flux"].transform(self.df[["phvac"]].values)
+        scaled_occ = self.scalers["occ"].fit_transform(self.df[["occ"]].values)
+
+        # Combine
         self.processed_data = np.hstack([
-            scaled_data[0],  # temp_room
-            scaled_data[1],  # temp_amb
-            scaled_data[2],  # solar
-            self.df[["day_sin", "day_cos"]].values,  # keep as-is (since it is already within -1 to 1)
-            scaled_data[3],  # occ
-            scaled_data[4],  # phvac
+            scaled_temp_room,
+            scaled_temp_amb,
+            scaled_solar,
+            self.df[["day_sin", "day_cos"]].values,
+            scaled_occ,
+            scaled_phvac,
         ])
 
     def prepare_data_splits(self):
@@ -127,7 +187,7 @@ class DataCook:
         en_len, de_len = self.args["enLen"], self.args["deLen"]
 
         self.trainingdf = self.processed_data[res * start : res * (start + train)]
-        # offset a little bit, since the prediction needs to start from 12:00
+        # offset an encoder, since the prediction needs to start from 12:00
         self.testingdf = self.processed_data[res * (start + train) - en_len :
                                              res * (start + train + test) + de_len]
 

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: modnn
-Version: 1.0.4
+Version: 2.0.1
 Summary: Physics-Informed Modularized Neural Network for Building Energy Modeling
 Author-email: Zixin Jiang <zjiang19@syr.edu>
 License-Expression: MIT
@@ -35,6 +35,11 @@ pip install modnn
 ## 🧠 Example
 Please find the online Jupyter notebook for a step-by-step instruction:
 https://colab.research.google.com/drive/1A2jt1q53RtxGuaoym6N1PmlKELDPpYFX?usp=sharing
+
+
+## 🧠 Update log
+To further improve physics consistency, 
+I replaced heattransfer module by energy balance equations, start from version 2.0.0
 
 
 ## 🧪 Requirements

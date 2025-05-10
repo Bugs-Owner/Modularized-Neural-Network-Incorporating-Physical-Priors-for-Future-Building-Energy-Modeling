@@ -8,8 +8,8 @@ import numpy as np
 import torch
 import matplotlib.dates as dates
 import matplotlib.pyplot as plt
-from modnn.Models import ModNN, BaseNN
-from modnn.Play import train_model, test_model, check_model, dynamic_check_model
+from modnn.Models import ModNN_phy, BaseNN, ModNN_data
+from modnn.Play import train_model, test_model, check_model, dynamic_check_model, grad_model
 import matplotlib
 import seaborn as sns
 from matplotlib.ticker import MaxNLocator
@@ -37,59 +37,64 @@ class Mod:
 
     def train(self):
         if "modnn" in self.args["modeltype"]:
-            model = ModNN.ModNN(self.args).to(self.device)
+            if self.args["envelop_mdl"] == "physics":
+                model = ModNN_phy.ModNN(self.args).to(self.device)
+            else:
+                model = ModNN_data.ModNN(self.args).to(self.device)
         if self.args["modeltype"] == "LSTM":
             model = BaseNN.Baseline(self.args).to(self.device)
         start_time = time.time()
         print('model training')
-        self.model, self.loss_dic = train_model(model=model,
+        self.model, self.train_log = train_model(model=model,
                                                 train_loader=self.dataset.TrainLoader,
                                                 valid_loader=self.dataset.ValidLoader,
                                                 test_loader =self.dataset.TestLoader,
                                                 lr=self.args["para"]['lr'],
                                                 epochs=self.args["para"]['epochs'],
                                                 patience=self.args["para"]['patience'],
-                                                tempscal = self.dataset.scalers['temp_room'],
-                                                fluxscal = self.dataset.scalers['phvac'],
+                                                tempscal = self.dataset.scalers['temp'],
+                                                fluxscal = self.dataset.scalers['flux'],
                                                 enlen = self.args['enLen'],
                                                 delen=self.args['deLen'],
                                                 rawdf = self.dataset.test_raw_df,
                                                 plott = self.args["plott"],
                                                 modeltype = self.args["modeltype"],
                                                 scale = self.args["scale"],
-                                                device=self.device)
+                                                device=self.device,
+                                                ext_mdl = self.args["ext_mdl"])
         print("--- %s seconds ---" % (time.time() - start_time))
 
-        folder_name = "../Saved/Trained_mdl" + 'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen']))
+        folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+                       'Enco{}_Deco{}'.format(str(self.args['enLen']),str(self.args['deLen'])))
         mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"], str(self.args["trainday"]), self.dataset.test_start)
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
         savemodel = os.path.join(folder_name, mdl_name)
         torch.save(model.state_dict(), savemodel)
 
-        folder_name = "../Saved/Loss" + 'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen']))
+        folder_name = ("../Saved/{}/Loss".format(self.args['save_name']) +
+                       'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
         loss_name = '{}Loss{}days_Test_on{}.pickle'.format(self.args["modeltype"], str(self.args["trainday"]), self.dataset.test_start)
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
         saveloss = os.path.join(folder_name, loss_name)
         with open(saveloss, 'wb') as f:
-            pickle.dump(self.loss_dic, f)
+            pickle.dump(self.train_log, f)
 
         # #Loss display
-
         # def _loss_norm(loss):
         #     loss_arr = np.array(loss)
         #     return np.log(loss_arr)
         #
         # color_paletteZ_ = ["#008744", "#0057e7", "#d62d20", "#ffa700"]
         # fig, ax = plt.subplots(1, 1, figsize=(1.5, 1.5), dpi=300, constrained_layout=True)
-        # ax.plot(_loss_norm(self.loss_dic['train_temp_losses']), label='Temp_mse', color='#f24e4c')
-        # ax.plot(_loss_norm(self.loss_dic['train_diff_losses']), label='Temp_diff', color='#bbe088')
+        # ax.plot(_loss_norm(self.train_log['train_temp_losses']), label='Temp_mse', color='#f24e4c')
+        # ax.plot(_loss_norm(self.train_log['train_diff_losses']), label='Temp_diff', color='#bbe088')
         #
-        # # ax.plot(self.loss_dic['valid_losses'], label='Validation_loss', color='#bbe088')
+        # # ax.plot(self.train_log['valid_losses'], label='Validation_loss', color='#bbe088')
         #
-        # ax.plot(_loss_norm(self.loss_dic['vio_positive_loss']), label='TRV+', color='#537af5')
-        # ax.plot(_loss_norm(self.loss_dic['vio_negative_loss']), label='TRV-', color='#f26fc4')
+        # ax.plot(_loss_norm(self.train_log['vio_positive_loss']), label='TRV+', color='#537af5')
+        # ax.plot(_loss_norm(self.train_log['vio_negative_loss']), label='TRV-', color='#f26fc4')
         # ax.set_ylabel('Loss_Norm', fontsize=7)
         # ax.set_xlabel('Epochs', fontsize=7)
         # ax.tick_params(axis='y', which='both', labelsize=7, pad=0.7)
@@ -101,8 +106,8 @@ class Mod:
 
     def train_valid_loss_plot(self):
         fig, ax = plt.subplots(1, 1, figsize=(1.96, 1.96), dpi=300, constrained_layout=True)
-        ax.plot(self.loss_dic['train_losses'], label='Training', color='#F0907F')
-        ax.plot(self.loss_dic['valid_losses'], label='Validation', color='#8B90F5')
+        ax.plot(self.train_log['train_losses'], label='Training', color='#F0907F')
+        ax.plot(self.train_log['valid_losses'], label='Validation', color='#8B90F5')
         ax.set_ylabel('Loss', fontsize=7)
         ax.set_xlabel('Epochs', fontsize=7)
         ax.tick_params(axis='y', which='both', labelsize=7, pad=0.7)
@@ -115,31 +120,40 @@ class Mod:
                            bbox_transform=ax.transAxes)
 
         # Plot the same data on the inset
-        axins.plot(self.loss_dic['train_losses'], label='Training_loss', color='#F0907F')
-        axins.plot(self.loss_dic['valid_losses'], label='Validation loss', color='#8B90F5')
+        axins.plot(self.train_log['train_losses'], label='Training_loss', color='#F0907F')
+        axins.plot(self.train_log['valid_losses'], label='Validation loss', color='#8B90F5')
 
         # Specify the limits of your zoom-in area
-        # x1, x2, y1, y2 = 50, 120, 0.001, 0.008
-        # axins.set_xlim(x1, x2)
-        # axins.set_ylim(y1, y2)
+        x1, x2, y1, y2 = 50, 120, 0.001, 0.008
+        axins.set_xlim(x1, x2)
+        axins.set_ylim(y1, y2)
 
-        # Optionally add grid, customize ticks, etc.
         axins.grid(True)
         axins.tick_params(axis='both', which='both', labelsize=5)
         ax.legend(loc='center', bbox_to_anchor=(0.5, 1.13), ncol=1, fontsize=7, frameon=False)
         plt.show()
 
     def load(self, mdl_name=None):
+        """
+        :param mdl_name: load an existing model or load just trained model
+        :return: model
+        """
         start_time = time.time()
         print("Loading model")
         if "modnn" in self.args["modeltype"]:
-            model = ModNN.ModNN(self.args).to(self.device)
+            if self.args["envelop_mdl"] == "physics":
+                model = ModNN_phy.ModNN(self.args).to(self.device)
+            else:
+                model = ModNN_data.ModNN(self.args).to(self.device)
         if self.args["modeltype"] == "LSTM":
             model = BaseNN.Baseline(self.args).to(self.device)
 
-        folder_name = "../Saved/Trained_mdl" + 'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen']))
+        folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+                       'Enco{}_Deco{}'.format(str(self.args['enLen']),str(self.args['deLen'])))
         if mdl_name is None:
-            mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"], str(self.args["trainday"]), self.dataset.test_start)
+            mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"],
+                                                       str(self.args["trainday"]),
+                                                       self.dataset.test_start)
         else:
             mdl_name=mdl_name
         if not os.path.exists(folder_name):
@@ -150,55 +164,203 @@ class Mod:
         self.model = model
         print("--- %s seconds ---" % (time.time() - start_time))
 
-    def test(self):
-        print('Testing start')
-        start_time = time.time()
+    def _calculate_metrics(y_true, y_pred):
+        """
+        Calculate error metrics for temperature predictions.
+
+        Args:
+            y_true (np.array): Ground truth temperature values
+            y_pred (np.array): Predicted temperature values
+
+        Returns:
+            dict: Dictionary containing evaluation metrics
+        """
+        y_true, y_pred = np.array(y_true), np.array(y_pred)
+
         def MAPE(y_true, y_pred):
-            y_true, y_pred = np.array(y_true), np.array(y_pred)
             return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
         def MAE(y_true, y_pred):
-            y_true, y_pred = np.array(y_true), np.array(y_pred)
             return np.mean(np.abs(y_true - y_pred))
 
-        self.to_out, self.en_out, self.de_out  = test_model(model=self.model, test_loader=self.dataset.TestLoader, device=self.device,
-                             tempscal=self.dataset.scalers['temp_room'], enlen=self.args['enLen'])
+        def MSE(y_true, y_pred):
+            return np.mean((y_true - y_pred) ** 2)
 
-        folder_name = "../Result/{}/".format(str(self.args["modeltype"])) + 'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen']))
+        metrics = {
+            'MAPE': MAPE(y_true, y_pred),
+            'MAE': MAE(y_true, y_pred),
+            'MSE': MSE(y_true, y_pred),
+            'RMSE': np.sqrt(MSE(y_true, y_pred))
+        }
+
+        return metrics
+
+    def _save_results(self, metrics, test_result, folder_prefix="../Result", is_new_data=False):
+        """
+        Save test results
+
+        Args:
+            metrics (dict): Dictionary of evaluation metrics
+            test_result (dict): Dictionary of test results
+            folder_prefix (str): Prefix for the folder path
+            is_new_data (bool): Whether this is for new data test or regular test
+        """
+        # Determine the test start date description
+        if is_new_data:
+            if hasattr(self, 'test_start'):
+                data_desc = f"new_data_Test_on{self.test_start}"
+            else:
+                data_desc = "new_data"
+        else:
+            data_desc = f"Train_with_{self.args['trainday']}days\\nTest_on{self.dataset.test_start}"
+
+        # Create folder if it doesn't exist
+        folder_name = (f"{folder_prefix}/{self.args['save_name']}/{self.args['modeltype']}/" +
+                       f'Enco{self.args["enLen"]}_Deco{self.args["deLen"]}')
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
-        csv_name = '(raw)Train_with_{}days\nTest_on{}.csv'.format(str(self.args["trainday"]), self.dataset.test_start)
-        savecsv = os.path.join(folder_name, csv_name)
-        self.dataset.test_raw_df.to_csv(savecsv)
-        test_len = len(self.de_out)
-        pred_len = self.args['deLen']
-        test_result = {}
-        mae = {}
-        mape = {}
-        gdtruth = (self.dataset.test_raw_df['temp_room'].values - 32) * 5 / 9
-        for timestep in range(test_len):
-            tem = self.de_out[timestep]
-            tem = (tem - 32) * 5 / 9
-            test_result[timestep] = tem
-            y_true = gdtruth[timestep: timestep + pred_len].reshape(-1, 1)
-            y_mear = self.de_out[timestep]
-            y_mear = (y_mear - 32) * 5 / 9
-            mae[timestep] = MAE(y_true=y_true, y_pred=y_mear)
-            mape[timestep] = MAPE(y_true=y_true, y_pred=y_mear)
-        self.mae = mae
-        self.mape = mape
-        dic_name = '(pred)Train_with_{}days\nTest_on{}.pkl'.format(str(self.args["trainday"]), self.dataset.test_start)
+
+        # Save raw data if available for regular test
+        if not is_new_data and hasattr(self, 'dataset') and hasattr(self.dataset, 'test_raw_df'):
+            csv_name = f'(raw){data_desc}.csv'
+            savecsv = os.path.join(folder_name, csv_name)
+            self.dataset.test_raw_df.to_csv(savecsv)
+
+        # Save predictions
+        dic_name = f'(pred){data_desc}.pkl'
         savedic = os.path.join(folder_name, dic_name)
         with open(savedic, 'wb') as f:
             pickle.dump(test_result, f)
-        mae_name = '(mae)Train_with_{}days\nTest_on{}.pkl'.format(str(self.args["trainday"]), self.dataset.test_start)
-        savemae = os.path.join(folder_name, mae_name)
-        with open(savemae, 'wb') as f:
-            pickle.dump(mae, f)
-        mape_name = '(mape)Train_with_{}days\nTest_on{}.pkl'.format(str(self.args["trainday"]), self.dataset.test_start)
-        savemape = os.path.join(folder_name, mape_name)
-        with open(savemape, 'wb') as f:
-            pickle.dump(mape, f)
-        print("--- %s seconds ---" % (time.time() - start_time))
+
+        # Save metrics
+        for metric_name, metric_values in metrics.items():
+            if isinstance(metric_values, dict):  # For per-timestep metrics
+                metric_file = f'({metric_name.lower()}){data_desc}.pkl'
+                save_path = os.path.join(folder_name, metric_file)
+                with open(save_path, 'wb') as f:
+                    pickle.dump(metric_values, f)
+            else:
+                pass
+
+    def test(self, testing_data_path=None):
+        """
+        Test model performance on either the default testing dataset or a specified testing dataset
+
+        Args:
+            testing_data_path (str, optional): Path to a new testing dataset
+
+        Returns:
+            dict: Performance metrics
+        """
+        print('Testing start')
+        start_time = time.time()
+
+        if testing_data_path is not None:
+            print('Testing on new dataset')
+
+            # Load new testing dataset using original scaler
+            new_args = self.args.copy()
+            new_args["datapath"] = testing_data_path
+            new_args["scaler_load"] = True
+            new_args["startday"] = 30
+            new_args["trainday"] = 180
+            new_args["testday"] = 1
+            DC_new = DataCook(args=new_args)
+
+            # Load original scaler
+            if hasattr(self, 'dataset') and self.dataset is not None and hasattr(self.dataset, 'scalers'):
+                DC_new.scalers = self.dataset.scalers
+            DC_new.load_data()
+            DC_new.prepare_data_splits()
+            test_loader = DC_new._create_dataloader(data=DC_new.testingdf, batch_size=len(DC_new.testingdf), shuffle=False)
+
+            # Run test on the new testing dataset
+            to_out, en_out, de_out = test_model(model=self.model,
+                                                test_loader=test_loader,
+                                                device=self.device,
+                                                tempscal=DC_new.scalers['temp'],
+                                                enlen=self.args['enLen'])
+
+            is_new_data = True
+            self.dataset = DC_new
+            self.test_start = DC_new.test_start
+            self.test_end = DC_new.test_end
+        else:
+            # Use the default testing dataset
+            to_out, en_out, de_out = test_model(model=self.model,
+                                                test_loader=self.dataset.TestLoader,
+                                                device=self.device,
+                                                tempscal=self.dataset.scalers['temp'],
+                                                enlen=self.args['enLen'])
+
+            is_new_data = False
+        true_temps = self.dataset.test_raw_df['temp_room'].values
+        test_df = self.dataset.test_raw_df
+        self.to_out, self.en_out, self.de_out = to_out, en_out, de_out
+        test_len = len(de_out)
+        pred_len = self.args['deLen']
+
+        # Calculate overall metrics
+        test_result = {}
+        mae = {}
+        mse = {}
+        mape = {}
+
+        gdtruth = (true_temps - 32) * 5 / 9 if self.args.get("temp_unit", "F") == "F" else true_temps
+
+        for timestep in range(test_len):
+            tem = de_out[timestep]
+            tem = (tem - 32) * 5 / 9 if self.args.get("temp_unit", "F") == "F" else tem
+            test_result[timestep] = tem
+
+            # Calculate metrics for this timestep
+            y_true = gdtruth[timestep: timestep + pred_len].reshape(-1, 1)
+            y_pred = tem
+
+            mae[timestep] = np.mean(np.abs(y_true - y_pred))
+            mse[timestep] = np.mean((y_true - y_pred) ** 2)
+            mape[timestep] = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+        # Store per-timestep metrics
+        self.mae = mae
+        self.mse = mse
+        self.mape = mape
+
+        # Calculate overall metrics
+        avg_metrics = {
+            'MAPE': np.mean(list(mape.values())),
+            'MAE': np.mean(list(mae.values())),
+            'MSE': np.mean(list(mse.values())),
+            'RMSE': np.sqrt(np.mean(list(mse.values())))
+        }
+
+        # Print metrics
+        print(f"Performance metrics:")
+        for metric, value in avg_metrics.items():
+            print(f"{metric}: {value:.4f}")
+
+        # Save detailed metrics and results
+        metrics = {
+            'mae': mae,
+            'mse': mse,
+            'mape': mape,
+            'summary': avg_metrics
+        }
+
+        # Save results
+        self._save_results(metrics, test_result, is_new_data=is_new_data)
+
+        # Store result for new testing data
+        if is_new_data:
+            self.new_test_results = {
+                'true_temps': true_temps,
+                'pred_temps': de_out,
+                'metrics': avg_metrics
+            }
+
+        print(f"--- {time.time() - start_time:.2f} seconds ---")
+
+        return avg_metrics
 
     def check(self):
         print('Checking start')
@@ -207,8 +369,8 @@ class Mod:
         (self.outputs_max_denorm, self.outputs_min_denorm, self.outputs_denorm,
          self.cooling_max_denorm, self.cooling_min_denorm) = check_model(model=self.model,
                                                                         test_loader=self.dataset.TestLoader,
-                                                                        tempscal=self.dataset.scalers['temp_room'],
-                                                                        hvacscale=self.dataset.scalers['phvac'],
+                                                                        tempscal=self.dataset.scalers['temp'],
+                                                                        hvacscale=self.dataset.scalers['flux'],
                                                                         enlen=self.args['enLen'],
                                                                         scale=self.args["scale"],
                                                                         checkscale = 1,
@@ -221,8 +383,8 @@ class Mod:
         start_time = time.time()
         self.dynamic_temp, self.dynamic_hvac = dynamic_check_model(model=self.model,
                                                                     test_loader=self.dataset.TestLoader,
-                                                                    tempscal=self.dataset.scalers['temp_room'],
-                                                                    hvacscale=self.dataset.scalers['phvac'],
+                                                                    tempscal=self.dataset.scalers['temp'],
+                                                                    hvacscale=self.dataset.scalers['flux'],
                                                                     enlen=self.args['enLen'],
                                                                     scale=self.args["scale"],
                                                                     device=self.device
@@ -239,7 +401,7 @@ class Mod:
                 td = _[timestep][:test_len - timestep] - self.dynamic_temp[u][timestep][:test_len - timestep]
                 vio += np.clip(td, 0, None).sum()
                 _ = self.dynamic_temp[u]
-        return vio, self.mae, self.loss_dic
+        return vio, self.mae, self.train_log
 
     def prediction_show(self):
         print('Ploting start')
@@ -496,46 +658,44 @@ class Mod:
         saveplot = os.path.join(folder, plot_name)
         fig.savefig(saveplot)
 
-    def grad_check(self, check_term="HVAC"):
+    def grad_check(self):
+        Joc_matrix_list = grad_model(model=self.model, test_loader=self.dataset.TestLoader, device=self.device)
+        Joc_matrix_ave = np.zeros_like(Joc_matrix_list[0])
+        for l in range(len(Joc_matrix_list)):
+            Joc_matrix_ave += Joc_matrix_list[l]
+        Joc_matrix_ave = Joc_matrix_ave / len(Joc_matrix_list)
 
-        Joc_input = torch.rand(1, 144, 7).to(self.device)
-        self.model.train()
-
-        def extract(Joc_input):
-            output, _, _ = self.model(Joc_input)
-            return output
-
-        Joc_matrix = F.jacobian(extract, Joc_input).detach().cpu().numpy().squeeze()
-
-        # Dictionary mapping term to corresponding index and label
-        term_map = {
-            "HVAC": {"index": 6, "ylabel": "HVAC Input (Timestep)"},
-            "SpaceT": {"index": 0, "ylabel": "Space Temp (Timestep)"},
-            "OA": {"index": 1, "ylabel": "Outdoor Air (Timestep)"},
-            "Solar": {"index": 2, "ylabel": "Solar Radiation (Timestep)"}
+        # Define the check terms and corresponding labels
+        check_terms = {
+            "HVAC": {"index": 6, "ylabel": "HVAC Power (Timestep)", "xlabel": "Zone Temp (Timestep)"},
+            "OA": {"index": 1, "ylabel": "Outdoor Air Temp (Timestep)", "xlabel": "Zone Temp (Timestep)"},
+            "Solar": {"index": 2, "ylabel": "Solar Radiation (Timestep)", "xlabel": "Zone Temp (Timestep)"},
+            "Occ": {"index": 5, "ylabel": "Occupancy (Timestep)", "xlabel": "Zone Temp (Timestep)"}
         }
 
-        if check_term not in term_map:
-            raise ValueError(f"Invalid check_term '{check_term}'. Choose from: {list(term_map.keys())}")
+        for name, meta in check_terms.items():
+            grad_matrix = Joc_matrix_ave[:, :, [meta["index"]]].squeeze()
 
-        idx = term_map[check_term]["index"]
-        ylabel = term_map[check_term]["ylabel"]
-        Joc_selected = Joc_matrix[:, :, [idx]].squeeze()
+            fig, ax = plt.subplots(1, 1, figsize=(2.84, 1.92), dpi=300, constrained_layout=True)
+            heatmap = sns.heatmap(
+                grad_matrix[48:48 + 96, 48:48 + 96].T, ax=ax,
+                cmap=sns.color_palette("ch:s=-.2,r=.6", as_cmap=True),
+                cbar_kws={'label': None}
+            )
 
-        fig, ax = plt.subplots(1, 1, figsize=(2.84, 1.92), dpi=300, constrained_layout=True)
-        heatmap = sns.heatmap(Joc_selected[48:, 48:].T, ax=ax, cmap=sns.color_palette("ch:s=-.2,r=.6", as_cmap=True),
-                              cbar_kws={'label': None})
+            ax.set_ylabel(meta["ylabel"], fontsize=9)
+            ax.set_xlabel(meta["xlabel"], fontsize=9)
+            ax.tick_params(axis='both', which='both', labelsize=5)
+            ax.margins(x=0)
 
-        ax.set_ylabel(ylabel, fontsize=9)
-        ax.set_xlabel('Temperature Output (Timestep)', fontsize=9)
-        ax.tick_params(axis='both', which='both', labelsize=5)
-        ax.margins(x=0)
+            cbar = heatmap.collections[0].colorbar
+            cbar.ax.tick_params(labelsize=5)
+            cbar.set_label('Gradient', size=9)
 
-        cbar = heatmap.collections[0].colorbar
-        cbar.ax.tick_params(labelsize=5)
-        cbar.set_label('Gradient', size=9)
+            plt.title(f'Jacobian Heatmap: {name}', fontsize=10)
 
-        plt.show()
+            plt.savefig(f'96 Steps Jacobian Heatmap: {name}.png', dpi=300)
+            plt.show()
 
 
 

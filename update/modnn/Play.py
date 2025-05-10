@@ -5,6 +5,7 @@ from torch import nn
 import matplotlib.pyplot as plt
 import matplotlib.dates as dates
 import os
+import time
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 
 def calc_correlation(actual, predic):
@@ -71,7 +72,11 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
-                patience, tempscal, fluxscal, enlen, delen, rawdf, plott, modeltype, scale, device):
+                patience, tempscal, fluxscal, enlen, delen,
+                rawdf, plott, modeltype, scale, device, ext_mdl):
+    num_update = 0
+    total_time = 0
+    time_every_update = {}
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     MSE_criterion = nn.MSELoss()
     early_stopping = EarlyStopping(patience=patience, verbose=True)
@@ -92,6 +97,8 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
         "PI-modnn|L": (0, 1),
         "PI-modnn|LC": (0, 0)
     }.get(modeltype, (None, None))
+    if envelop_mdl=="physics":
+        Phy_loss, Phy_cons = None, None
     if Phy_loss is None:
         raise ValueError("Unknown modeltype")
 
@@ -103,14 +110,16 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
             train_loss_diff  = 0.0
             train_loss_total = 0.0
             for data, target in train_loader:
+                time_start = time.time()
                 data, target = data.to(device), target.to(device)
                 optimizer.zero_grad()
                 # In real world application, we perhaps only have label for Tzone
                 # So we only compute loss based on that
                 # But if the flux is avaliable, like EPlus data, we can add it here to improve model performance
                 Temp,_,_ = model(data)
-                Temp_loss = MSE_criterion(Temp, target[:, :, [0]])
+                Temp_loss = MSE_criterion(Temp[:, enlen:, :], target[:, enlen:, [0]])
                 Diff_loss = torch.mean(torch.abs((Temp[:, 1:, :] - Temp[:, :-1, :]) - (target[:, 1:, :] - target[:, :-1, :])))
+
                 loss = Temp_loss + diff_alpha * Diff_loss * Phy_loss
                 loss.backward()
                 optimizer.step()
@@ -118,18 +127,28 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 if Phy_cons==1:
                     try:
                         # Positive Hard Constraints
-                        model.Zone.FC.weight.data.clamp_(0)
-                        model.HVAC.FC.weight.data.clamp_(0)
+                        model.Zone.scale.weight.data.clamp_(0)
                         model.Int.scale.weight.data.clamp_(0)
-                        model.Ext.FC.weight.data.clamp_(0)
-                        model.Ext.rnn.weight.data.clamp_(0)
+                        model.HVAC.scale.weight.data.clamp_(0)
+                        model.Ext.conduction.weight.data.clamp_(0)
+                        if ext_mdl == 'RNN':
+                            model.Ext.rnn.weight.data.clamp_(0)
+                        else:
+                            pass
                     except:
                         pass
-
+                time_elapsed = time.time() - time_start
+                total_time += time_elapsed
+                num_update += 1
+                time_every_update[num_update] = time_elapsed
                 train_loss_temp += Temp_loss.item() * data.size(0)
                 train_loss_diff += Diff_loss.item() * data.size(0)
                 train_loss_total += loss.item() * data.size(0)
 
+            # fig, ax = plt.subplots(1, 1, figsize=(3.2, 1.8), dpi=300, constrained_layout=True)
+            # plt.plot(Temp.cpu().detach().numpy()[0, :, :])
+            # plt.plot(target[:, :, [0]].cpu().detach().numpy()[0, :, :])
+            # plt.show()
             # Validation phase
             model.eval()
             valid_loss = 0.0
@@ -137,7 +156,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 for data, target in valid_loader:
                     data, target = data.to(device), target.to(device)
                     Temp,_,_ = model(data)
-                    Temp_loss = MSE_criterion(Temp, target[:, :, [0]])
+                    Temp_loss = MSE_criterion(Temp[:, enlen:, :], target[:, enlen:, [0]])
                     Diff_loss = torch.mean(
                         torch.abs((Temp[:, 1:, :] - Temp[:, :-1, :]) - (target[:, 1:, :] - target[:, :-1, :])))
                     loss = Temp_loss + diff_alpha * Diff_loss * Phy_loss
@@ -172,13 +191,14 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 outputs_max, hvac_max, other_max = outputs_max_check.cpu(), hvac_max_check.cpu(), other_max_check
                 outputs_min, hvac_min, other_min = outputs_min_check.cpu(), hvac_min_check.cpu(), other_min_check
                 Temp_out, hvac_out, other_out = Temp.cpu(), hvac_flux.cpu(), other_flux
-                inter_out = other_out[0].cpu()
-                external_out = other_out[1].cpu()
+                external_out = other_out[0].cpu()
+                inter_out = other_out[1].cpu()
+                delta_out = other_out[2].cpu()
 
                 outputs_max_denorm, outputs_min_denorm = [], []
                 Temp_out_denorm, Other_out_denorm = [], []
                 hvac_max_denorm, hvac_min_denorm, hvac_out_denorm = [], [], []
-                inter_out_denorm, external_out_denorm = [], []
+                inter_out_denorm, external_out_denorm, delta_out_denorm = [], [], []
 
                 for idx in range(outputs_max.shape[0]):
                     outputs_max_denorm.append(
@@ -195,10 +215,13 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                     hvac_out_denorm.append(
                         fluxscal.inverse_transform(hvac_out[[idx], enlen:, :].reshape(-1, 1)))
 
-                    inter_out_denorm.append(
-                        fluxscal.inverse_transform(inter_out[[idx], enlen:, :].reshape(-1, 1)))
-                    external_out_denorm.append(
-                        fluxscal.inverse_transform(external_out[[idx], enlen:, :].reshape(-1, 1)))
+                    #TODO: collect different heat fluxes, need match with different model, leave it  later
+                    # inter_out_denorm.append(
+                    #     fluxscal.inverse_transform(inter_out[[idx], enlen:, :].reshape(-1, 1)))
+                    # external_out_denorm.append(
+                    #     fluxscal.inverse_transform(external_out[[idx], enlen:, :].reshape(-1, 1)))
+                    # delta_out_denorm.append(
+                    #     fluxscal.inverse_transform(delta_out[[idx], enlen:, :].reshape(-1, 1)))
 
                 test_len = len(outputs_max_denorm)
                 pred_len = delen
@@ -282,26 +305,54 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 # But also lean the heat flux, change it to yes to see flux response
                 # However, in most cases, we don't have flux observation, so this output is hard to guarantee and evaluate
                 if flux == True :
-                    fig, ax = plt.subplots(1, 1, figsize=(3.2, 1.8), dpi=300, constrained_layout=True)
-                    # Plot
+                    fig, axs = plt.subplots(4, 1, figsize=(3.2, 4.8), dpi=300, constrained_layout=True, sharex=True)
                     timestep = 0
                     inter = inter_out_denorm[timestep][:test_len - timestep]
                     outer = external_out_denorm[timestep][:test_len - timestep]
-                    ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
-                                     inter, '-', linewidth=1, color="#8163FD", label="Internal Heat Gain")
-                    ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
-                                 outer, '-', linewidth=1, color="#FF5F5D", label="External Heat Gain")
+                    hvac = hvac_out_denorm[timestep][:test_len - timestep]
+                    total = delta_out_denorm[timestep][:test_len - timestep]
+                    time_index = rawdf.index[timestep:timestep + pred_len][:test_len - timestep]
 
-                    ax.tick_params(axis='both', which='minor', labelsize=7)
-                    ax.tick_params(axis='both', which='major', labelsize=7)
-                    ax.xaxis.set_minor_locator(dates.HourLocator(interval=4))
-                    ax.xaxis.set_minor_formatter(dates.DateFormatter("%H"))
-                    ax.xaxis.set_major_locator(dates.DayLocator(interval=1))
-                    ax.xaxis.set_major_formatter(dates.DateFormatter('%b-%d'))
-                    ax.set_xlabel(None)
-                    ax.set_ylabel('Heat Transfer (W)', fontsize=7)
-                    ax.margins(x=0)
-                    ax.legend(loc='center', bbox_to_anchor=(0.5, 1.1), ncol=2, fontsize=6, frameon=False)
+                    # --- Plot Temp ---
+                    axs[0].plot_date(time_index, tem, '--', linewidth=1, color="green", label="Temp")
+                    axs[0].plot_date(time_index, (rawdf["temp_room"][timestep:timestep + pred_len][:test_len - timestep]-32)*5/9,
+                                     '-', linewidth=1, color="green", label="Temp Mear")
+                    axs[0].set_ylabel('Zone Temp\n(°C)', fontsize=7)
+                    axs[0].legend(loc='center', bbox_to_anchor=(0.5, 1.2), ncol=2, fontsize=6, frameon=False)
+                    axs[0].tick_params(axis='both', which='both', labelsize=7)
+
+                    # --- Plot IntGain ---
+                    axs[1].plot_date(time_index, inter, '--', linewidth=1, color="#8163FD", label="IntGain")
+                    axs[1].plot_date(time_index, rawdf["Int_cov"][timestep:timestep + pred_len][:test_len - timestep],
+                                     '-', linewidth=1, color="#8163FD", label="IntGain Mear")
+                    axs[1].set_ylabel('Heat Transfer\n(W)', fontsize=7)
+                    axs[1].legend(loc='center', bbox_to_anchor=(0.5, 1.2), ncol=2, fontsize=6, frameon=False)
+                    axs[1].tick_params(axis='both', which='both', labelsize=7)
+
+                    # --- Plot ExtGain ---
+                    axs[2].plot_date(time_index, outer, '--', linewidth=1, color="#FF5F5D", label="ExtGain")
+                    axs[2].plot_date(time_index, rawdf["Sur_cov"][timestep:timestep + pred_len][:test_len - timestep],
+                                     '-', linewidth=1, color="#FF5F5D", label="ExtGain Mear")
+                    axs[2].set_ylabel('Heat Transfer\n(W)', fontsize=7)
+                    axs[2].legend(loc='center', bbox_to_anchor=(0.5, 1.2), ncol=2, fontsize=6, frameon=False)
+                    axs[2].tick_params(axis='both', which='both', labelsize=7)
+
+                    # --- Plot Delta Q ---
+                    axs[3].plot_date(time_index, total, '--', linewidth=1, color="black", label="Delta Q")
+                    axs[3].plot_date(time_index, rawdf["Eng_stg"][timestep:timestep + pred_len][:test_len - timestep],
+                                     '-', linewidth=1, color="black", label="Delta Q Mear")
+                    axs[3].set_ylabel('Heat Transfer\n(W)', fontsize=7)
+                    axs[3].legend(loc='center', bbox_to_anchor=(0.5, 1.2), ncol=2, fontsize=6, frameon=False)
+                    axs[3].tick_params(axis='both', which='both', labelsize=7)
+
+                    # Set X axis for bottom subplot only
+                    axs[3].xaxis.set_minor_locator(dates.HourLocator(interval=4))
+                    axs[3].xaxis.set_minor_formatter(dates.DateFormatter("%H"))
+                    axs[3].xaxis.set_major_locator(dates.DayLocator(interval=1))
+                    axs[3].xaxis.set_major_formatter(dates.DateFormatter('%b-%d'))
+                    axs[3].set_xlabel(None)
+                    axs[3].margins(x=0)
+
                     plt.show()
                 else:
                     pass
@@ -321,7 +372,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
         # load the last checkpoint with the best model
         model.load_state_dict(torch.load("../Checkpoint/best.pt"))
 
-        loss_dic = {
+        train_log = {
             'train_total_losses': train_total_losses,
             'train_temp_losses': train_temp_losses,
             'train_diff_losses': train_diff_losses,
@@ -329,9 +380,12 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
             'vio_positive_loss': vio_positive_loss,
             'vio_negative_loss': vio_negative_loss,
             'mae_loss': mae_loss,
+            'total_time': total_time,
+            'num_update': num_update,
+            'time_every_update': time_every_update
         }
 
-        return model, loss_dic
+        return model, train_log
 
 def eval_model(model, test_loader, modeltype, tempscal, enlen, rawdf, device):
     # evaluate one-step prediction
@@ -482,5 +536,24 @@ def dynamic_check_model(model, test_loader, enlen, scale, tempscal, hvacscale, d
         dynamic_hvac[u] = phvac_denorm
 
     return dynamic_temp, dynamic_hvac
+
+def grad_model(model, test_loader, device):
+    from torch.autograd.functional import jacobian
+    model.train()
+
+    def model_output(x):
+        output, _, _ = model(x)
+        return output
+
+    for data, target in test_loader:
+        Joc_input, _ = data.to(device), target.to(device)
+        Joc_input.requires_grad_(True)
+
+        Joc_matrix_list = []
+        for index in range(Joc_input.shape[0]):
+            Joc_matrix = jacobian(model_output, Joc_input[[index], :, :])
+            Joc_matrix_list.append(Joc_matrix.detach().cpu().numpy().squeeze())
+
+    return Joc_matrix_list
 
 
