@@ -73,7 +73,7 @@ class EarlyStopping:
 
 def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 patience, tempscal, fluxscal, enlen, delen,
-                rawdf, plott, modeltype, scale, device, ext_mdl):
+                rawdf, plott, modeltype, scale, device, ext_mdl, envelop_mdl):
     num_update = 0
     total_time = 0
     time_every_update = {}
@@ -98,7 +98,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
         "PI-modnn|LC": (0, 0)
     }.get(modeltype, (None, None))
     if envelop_mdl=="physics":
-        Phy_loss, Phy_cons = None, None
+        Phy_loss, Phy_cons = 0, 0
     if Phy_loss is None:
         raise ValueError("Unknown modeltype")
 

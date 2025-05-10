@@ -66,7 +66,7 @@ def _args(**kwargs):
         "envelop": _envelops(**envelop_overrides),
         # Paths and device
         "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_AC_off_2month.csv", #"../Dataset/EPlus.csv",
-        "device": "cuda:1",
+        "device": "cuda:0",
         "save_name": "Mid",
 
         # Data settings

@@ -61,7 +61,8 @@ class Mod:
                                                 modeltype = self.args["modeltype"],
                                                 scale = self.args["scale"],
                                                 device=self.device,
-                                                ext_mdl = self.args["ext_mdl"])
+                                                ext_mdl = self.args["ext_mdl"],
+                                                envelop_mdl = self.args["envelop_mdl"],)
         print("--- %s seconds ---" % (time.time() - start_time))
 
         folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
