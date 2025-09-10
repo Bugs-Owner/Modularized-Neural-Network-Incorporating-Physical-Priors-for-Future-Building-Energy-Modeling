@@ -30,3 +30,7 @@ Fix bug for step function
 # 🧠 [3.0.3] 2025 June 11
 Fix bug for step function
 
+# 🧠 [3.0.4] 2025 Sept 10
+Didn't work on it for 3 months, just update the latest version
+Will use it for BESTOpt building dynamic model
+
