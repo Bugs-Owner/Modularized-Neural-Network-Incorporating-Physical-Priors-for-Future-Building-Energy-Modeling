@@ -4,6 +4,7 @@ from tqdm import trange
 from torch import nn
 import matplotlib.pyplot as plt
 import matplotlib.dates as dates
+from torch.autograd.functional import jacobian
 import os
 import time
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
@@ -40,12 +41,12 @@ class EarlyStopping:
         self.path = path
         self.trace_func = trace_func
 
-    def __call__(self, val_loss, model):
+    def __call__(self, val_loss, model, epoch_num):
         score = -val_loss
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            self.save_checkpoint(val_loss, model, epoch_num)
         elif score < self.best_score + self.delta:
             self.counter += 1
             self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -53,18 +54,23 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            self.save_checkpoint(val_loss, model, epoch_num)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
+    def save_checkpoint(self, val_loss, model, epoch_num):
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-
+        # with epoch_num for debug use
         folder_name = self.path
-        mdl_name = 'best.pt'
+        mdl_name = f'best{epoch_num}.pt'
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
+        savemodel = os.path.join(folder_name, mdl_name)
+        self.savemodel = savemodel
+        torch.save(model.state_dict(), savemodel)
+
+        mdl_name = 'best.pt'
         savemodel = os.path.join(folder_name, mdl_name)
         self.savemodel = savemodel
         torch.save(model.state_dict(), savemodel)
@@ -73,7 +79,7 @@ class EarlyStopping:
 
 def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 patience, tempscal, fluxscal, enlen, delen,
-                rawdf, plott, modeltype, scale, device, ext_mdl, envelop_mdl):
+                rawdf, plott, modeltype, scale, device, ext_mdl, envelop_mdl, diff_alpha):
     num_update = 0
     total_time = 0
     time_every_update = {}
@@ -87,7 +93,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
     mae_loss = []
     device = device
 
-    diff_alpha = 0.3  # weight for temporal difference loss
+    diff_alpha = diff_alpha  # weight for temporal difference loss
 
     # Flags for physics-informed loss
     Phy_loss, Phy_cons = {
@@ -109,70 +115,82 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
             train_loss_temp  = 0.0
             train_loss_diff  = 0.0
             train_loss_total = 0.0
-            for data, target in train_loader:
-                time_start = time.time()
-                data, target = data.to(device), target.to(device)
-                optimizer.zero_grad()
-                # In real world application, we perhaps only have label for Tzone
-                # So we only compute loss based on that
-                # But if the flux is avaliable, like EPlus data, we can add it here to improve model performance
-                Temp,_,_ = model(data)
-                Temp_loss = MSE_criterion(Temp[:, enlen:, :], target[:, enlen:, [0]])
-                Diff_loss = torch.mean(torch.abs((Temp[:, 1:, :] - Temp[:, :-1, :]) - (target[:, 1:, :] - target[:, :-1, :])))
+            for train_loader_single in train_loader:
+                for data, target in train_loader_single:
+                    time_start = time.time()
+                    data, target = data.to(device), target.to(device)
+                    optimizer.zero_grad()
+                    # In real world application, we perhaps only have label for Tzone
+                    # So we only compute loss based on that
+                    # But if the flux is avaliable, like EPlus data, we can add it here to improve model performance
+                    Temp,_,__ = model(data)
+                    # fig, ax = plt.subplots(1, 1, figsize=(3.2, 1.8), dpi=300, constrained_layout=True)
+                    # Plot raw data
+                    # ax.plot(__[0][0].cpu().detach().numpy(), label='int')
+                    # ax.plot(__[0][1].cpu().detach().numpy(), label='hvac')
+                    # ax.plot(__[0][2].cpu().detach().numpy(), label='ext')
+                    # ax.plot(__[0][3].cpu().detach().numpy(), label='direct')
+                    # ax.legend()
+                    # plt.show()
 
-                loss = Temp_loss + diff_alpha * Diff_loss * Phy_loss
-                loss.backward()
-                optimizer.step()
+                    Temp_loss = MSE_criterion(Temp[:, enlen:, :], target[:, enlen:, [0]])
+                    Diff_loss = torch.mean(torch.abs((Temp[:, 1:, :] - Temp[:, :-1, :]) - (target[:, 1:, :] - target[:, :-1, :])))
 
-                if Phy_cons==1:
-                    try:
-                        # Positive Hard Constraints
-                        model.Zone.scale.weight.data.clamp_(0)
-                        model.Int.scale.weight.data.clamp_(0)
-                        model.HVAC.scale.weight.data.clamp_(0)
-                        model.Ext.conduction.weight.data.clamp_(0)
-                        if ext_mdl == 'RNN':
-                            model.Ext.rnn.weight.data.clamp_(0)
-                        else:
+                    loss = Temp_loss + diff_alpha * Diff_loss * Phy_loss
+                    loss.backward()
+                    optimizer.step()
+
+                    if Phy_cons==1:
+                        try:
+                            # Positive Hard Constraints
+                            model.Zone.scale.weight.data.clamp_(0)
+                            # model.Zone.dym.weight_ih_l0.data.clamp_(0)
+                            # model.Zone.dym.weight_hh_l0.data.clamp_(0)
+                            # model.Zone.fc.weight.data.clamp_(0)
+                            model.Int.scale.weight.data.clamp_(0)
+                            model.HVAC.scale.weight.data.clamp_(0)
+
+
+                            # model.Ext.conduction.weight.data.clamp_(0)
+                            if ext_mdl == 'RNN':
+                                model.Ext.rnn.weight_ih_l0.data.clamp_(0)
+                                model.Ext.rnn.weight_hh_l0.data.clamp_(0)
+                            else:
+                                pass
+                        except:
                             pass
-                    except:
-                        pass
-                time_elapsed = time.time() - time_start
-                total_time += time_elapsed
-                num_update += 1
-                time_every_update[num_update] = time_elapsed
-                train_loss_temp += Temp_loss.item() * data.size(0)
-                train_loss_diff += Diff_loss.item() * data.size(0)
-                train_loss_total += loss.item() * data.size(0)
-
-            # fig, ax = plt.subplots(1, 1, figsize=(3.2, 1.8), dpi=300, constrained_layout=True)
-            # plt.plot(Temp.cpu().detach().numpy()[0, :, :])
-            # plt.plot(target[:, :, [0]].cpu().detach().numpy()[0, :, :])
-            # plt.show()
+                    time_elapsed = time.time() - time_start
+                    total_time += time_elapsed
+                    num_update += 1
+                    time_every_update[num_update] = time_elapsed
+                    train_loss_temp += Temp_loss.item() * data.size(0)
+                    train_loss_diff += Diff_loss.item() * data.size(0)
+                    train_loss_total += loss.item() * data.size(0)
             # Validation phase
             model.eval()
             valid_loss = 0.0
             with torch.no_grad():
-                for data, target in valid_loader:
-                    data, target = data.to(device), target.to(device)
-                    Temp,_,_ = model(data)
-                    Temp_loss = MSE_criterion(Temp[:, enlen:, :], target[:, enlen:, [0]])
-                    Diff_loss = torch.mean(
-                        torch.abs((Temp[:, 1:, :] - Temp[:, :-1, :]) - (target[:, 1:, :] - target[:, :-1, :])))
-                    loss = Temp_loss + diff_alpha * Diff_loss * Phy_loss
-                    valid_loss += loss.item() * data.size(0)
+                for valid_loader_single in valid_loader:
+                    for data, target in valid_loader_single:
+                        data, target = data.to(device), target.to(device)
+                        Temp,_,_ = model(data)
+                        Temp_loss = MSE_criterion(Temp[:, enlen:, :], target[:, enlen:, [0]])
+                        Diff_loss = torch.mean(
+                            torch.abs((Temp[:, 1:, :] - Temp[:, :-1, :]) - (target[:, 1:, :] - target[:, :-1, :])))
+                        loss = Temp_loss + diff_alpha * Diff_loss * Phy_loss
+                        valid_loss += loss.item() * data.size(0)
 
-            train_loss_total = train_loss_total / len(train_loader.dataset)
-            Temp_loss = train_loss_temp / len(train_loader.dataset)
-            Diff_loss = train_loss_diff / len(train_loader.dataset)
-            valid_loss = valid_loss / len(valid_loader.dataset)
+            train_loss_total = train_loss_total / len(train_loader_single.dataset)
+            Temp_loss = train_loss_temp / len(train_loader_single.dataset)
+            Diff_loss = train_loss_diff / len(train_loader_single.dataset)
+            valid_loss = valid_loss / len(valid_loader_single.dataset)
 
             train_total_losses.append(train_loss_total)
             train_temp_losses.append(Temp_loss)
             train_diff_losses.append(Diff_loss)
             valid_losses.append(valid_loss)
 
-            res=10
+            res=5
             # How many epoch we want to display our training results
             # It can help us to dynamically understand the model performance
             if epoch % res == 0:
@@ -226,34 +244,41 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 test_len = len(outputs_max_denorm)
                 pred_len = delen
                 display = True
-                if display == True :
+                if display == True:
                     fig, ax = plt.subplots(1, 1, figsize=(3.2, 1.8), dpi=300, constrained_layout=True)
                     # Plot raw data
-                    ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len] - 32) * 5 / 9,
+                    meas=(rawdf['temp_room'].values[:test_len])
+                    ax.plot_date(rawdf.index[:test_len], meas,
                                  '-', linewidth=1, color="#159A9C", label='Measurement')
+                    #
+                    # ax.plot_date(rawdf.index[:test_len], (rawdf['temp_amb'].values[:test_len] - 32) * 5 / 9,
+                    #              '-', linewidth=1, color="black", label='T_out')
                     # Plot
                     name = modeltype
                     timestep = 0
                     tem = Temp_out_denorm[timestep][:test_len - timestep]
-                    tem = (tem - 32) * 5 / 9
                     ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
                                      tem, '-', linewidth=1, color="gray", label=name)
+                    # ax.set_ylim(meas.min()-1, meas.max()+1)
+                    # for timestep in [24, 48, 72]:
+                    #     tem_other = Temp_out_denorm[timestep][:test_len - timestep]
+                    #     tem_other = (tem_other - 32) * 5 / 9
+                    #     ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
+                    #                  tem_other, '-', linewidth=1, color="gray")
 
                     # Plot check
                     if plott == 'all':
                         for timestep in [0]:
                             minn = outputs_min_denorm[timestep][:test_len - timestep]
-                            minn = (minn - 32) * 5 / 9
                             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], minn, '--', linewidth=1,
                                          color="#8163FD", label='Max Cooling')
                             maxx = outputs_max_denorm[timestep][:test_len - timestep]
-                            maxx = (maxx - 32) * 5 / 9
                             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], maxx, '--', linewidth=1,
                                          color="#FF5F5D", label='Max Heating')
                     else:
                         pass
 
-                    y_true = ((rawdf['temp_room'].values[:delen][:test_len] - 32) * 5 / 9).reshape(-1, 1)
+                    y_true = ((rawdf['temp_room'].values[:delen][:test_len])).reshape(-1, 1)
                     y_pred = tem
                     mae = mean_absolute_error(y_true, y_pred)
                     mape = mean_absolute_percentage_error(y_true, y_pred) * 100
@@ -263,10 +288,8 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                     # Temperature response violation
                     for timestep in range(len(Temp_out_denorm)):
                         minn = outputs_min_denorm[timestep][:test_len - timestep]
-                        minn = (minn - 32) * 5 / 9
                         maxx = outputs_max_denorm[timestep][:test_len - timestep]
-                        maxx = (maxx - 32) * 5 / 9
-                        y_pred = (Temp_out_denorm[timestep][:test_len - timestep] - 32) * 5 / 9
+                        y_pred = (Temp_out_denorm[timestep][:test_len - timestep])
                         y_pred = y_pred
                         vio1 += np.clip((minn - y_pred), 0, None).sum()
                         vio2 += np.clip((y_pred - maxx), 0, None).sum()
@@ -364,7 +387,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                            valid_loss="{0:.5f}".format(valid_loss))
 
             # Early Stopping
-            early_stopping(valid_loss, model)
+            early_stopping(valid_loss, model, epoch)
             if early_stopping.early_stop:
                 print("Early stopping")
                 break
@@ -414,7 +437,7 @@ def eval_model(model, test_loader, modeltype, tempscal, enlen, rawdf, device):
         test_len = len(denorm_eva_out)
         fig, ax = plt.subplots(1, 1, figsize=(3.2, 1.8), dpi=300, constrained_layout=True)
         # Plot raw data
-        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len] - 32) * 5 / 9,
+        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len]),
                      '-', linewidth=1, color="#159A9C", label='Measurement')
         # Plot
         if modeltype == 'SeqPINN' or modeltype == 'modnn':
@@ -423,7 +446,6 @@ def eval_model(model, test_loader, modeltype, tempscal, enlen, rawdf, device):
             name = 'LSTM'
 
         tem = denorm_eva_out
-        tem = (tem - 32) * 5 / 9
         ax.plot_date(rawdf.index[:test_len],
                      tem, '-', linewidth=1, color="gray", label=name)
 
@@ -555,5 +577,148 @@ def grad_model(model, test_loader, device):
             Joc_matrix_list.append(Joc_matrix.detach().cpu().numpy().squeeze())
 
     return Joc_matrix_list
+
+def control_model(dynamic_mdl, control_mdl, control_loader, args, test_loader, hvacscale):
+    optimizer = torch.optim.Adam(control_mdl.parameters(), lr=args["para"]['policy_lr'])
+
+    with (trange(args["para"]['policy_epochs']) as tr):
+        for epoch in tr:
+            control_mdl.train()
+            vio = 0.0
+            train_losses = []
+            train_loss, temperature_loss, price_loss = 0, 0, 0
+            for data, _ in control_loader:
+                data = data.to(args["device"])
+                optimizer.zero_grad()
+                u_opt = control_mdl(data)
+
+                embed_data = data.clone()
+                embed_data[:, args['enLen']-1:-1, [6]] = u_opt
+                Tpred,_,_ = dynamic_mdl(embed_data)
+                setpt_cool = data[:, :, [7]]
+                setpt_heat = data[:, :, [8]]
+                # Temperature Violation
+                uppervio = nn.functional.relu(Tpred - setpt_cool)
+                lowervio = nn.functional.relu(setpt_heat - Tpred)
+                if args["control_mode"] == "Cooling":
+                    vio = (torch.sum(torch.square(uppervio)))
+                elif args["control_mode"] == "Heating":
+                    vio = (torch.sum(torch.square(lowervio)))
+                else:
+                    vio = (torch.sum(torch.square(uppervio))) + (torch.sum(torch.square(lowervio)))
+                # Utility Price
+                range_min, range_max = hvacscale.feature_range
+                data_min = torch.from_numpy(hvacscale.data_min_).to(u_opt.device).float()
+                data_max = torch.from_numpy(hvacscale.data_max_).to(u_opt.device).float()
+                u_denorm = (u_opt - range_min) / (range_max - range_min) * (data_max - data_min) + data_min
+                price = torch.sum(torch.square(u_denorm/1000*data[:, args['enLen']-1:-1, [9]]))
+
+                to_loss = price + vio*10
+                to_loss.backward()
+                optimizer.step()
+
+                train_loss += to_loss.item() * data.size(0)
+                temperature_loss += vio.item() * data.size(0)
+                price_loss += price.item() * data.size(0)
+
+            control_mdl.eval()
+            res = 10
+            if epoch % res == 0:
+                with torch.no_grad():  # No gradients needed
+                    for data, _ in test_loader:
+                        data = data.to(args["device"])
+                        u_opt = control_mdl(data)
+                        data[:, args['enLen'] - 1:-1, [6]] = u_opt
+                        Tpred, _, _ = dynamic_mdl(data)
+                        setpt_cool = data[:, :, [7]]
+                        setpt_heat = data[:, :, [8]]
+
+                        range_min, range_max = hvacscale.feature_range
+                        data_min = torch.from_numpy(hvacscale.data_min_).to(u_opt.device).float()
+                        data_max = torch.from_numpy(hvacscale.data_max_).to(u_opt.device).float()
+                        u_denorm = (u_opt - range_min) / (range_max - range_min) * (data_max - data_min) + data_min
+
+                        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3.2, 2.8), dpi=300, sharex=True, constrained_layout=True)
+
+                        # Unpack and squeeze for plotting
+                        # Only show step 1
+                        Tpred_np = Tpred[0].squeeze().cpu().detach().numpy()
+                        setpt_cool_np = setpt_cool[0].squeeze().cpu().detach().numpy()
+                        setpt_heat_np = setpt_heat[0].squeeze().cpu().detach().numpy()
+                        u_opt_np = u_denorm[0].squeeze().cpu().detach().numpy()
+                        price_signal = data[:, args['enLen'] - 1:-1, [9]][0].squeeze().cpu().numpy()
+
+                        # --- Upper subplot: Temperature with Setpoints ---
+                        ax1.plot(Tpred_np[args['enLen'] - 1:-1], label="zone_temp", color="black", linewidth=1)
+                        ax1.plot(setpt_cool_np[args['enLen'] - 1:-1], label="setpt_cool", linestyle="--", color="gray", linewidth=0.8)
+                        ax1.plot(setpt_heat_np[args['enLen'] - 1:-1], label="setpt_heat", linestyle="--", color="gray", linewidth=0.8)
+                        ax1.set_ylabel("Temp")
+                        ax1.legend(fontsize=6, loc='upper right')
+
+                        # --- Lower subplot: Power with Peak Hour Shading ---
+                        ax2.plot(u_opt_np, label="Opt_Load", color="blue", linewidth=1)
+                        ax2.set_ylabel("Power")
+
+                        # Highlight peak price hours (assuming price > 1 means peak)
+                        peak_indices = (price_signal > 1 ).astype(float)
+                        for i, val in enumerate(peak_indices):
+                            if val == 1:
+                                ax2.axvspan(i - 0.5, i + 0.5, color='orange', alpha=0.3)
+
+                        ax2.legend(fontsize=6, loc='upper right')
+
+                        # No x-labels as requested
+                        ax1.tick_params(labelbottom=False)
+                        plt.show()
+
+                        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3.2, 2.8), dpi=300, sharex=True,
+                                                       constrained_layout=True)
+
+                        # Unpack and squeeze for plotting
+                        # Plot all 96 samples, but only the first timestep of each
+                        Tpred_np = Tpred[:, args['enLen'], 0].cpu().detach().numpy()  # shape: [96]
+                        setpt_cool_np = setpt_cool[:, args['enLen'], 0].cpu().detach().numpy()
+                        setpt_heat_np = setpt_heat[:, args['enLen'], 0].cpu().detach().numpy()
+                        u_opt_np = u_denorm[:, args['enLen'], 0].cpu().detach().numpy()
+                        price_signal = data[:, args['enLen'] - 1,
+                                       9].cpu().numpy()  # One value per sample at that time index
+
+                        # --- Upper subplot: Temperature with Setpoints (just 1st step for all) ---
+                        x_range = range(len(Tpred_np))
+                        ax1.plot(x_range, Tpred_np, label="zone_temp", color="black", linewidth=1)
+                        ax1.plot(x_range, setpt_cool_np, label="setpt_cool", linestyle="--", color="gray",
+                                 linewidth=0.8)
+                        ax1.plot(x_range, setpt_heat_np, label="setpt_heat", linestyle="--", color="gray",
+                                 linewidth=0.8)
+                        ax1.set_ylabel("Temp")
+                        ax1.legend(fontsize=6, loc='upper right')
+
+                        # --- Lower subplot: Power with Peak Hour Shading ---
+                        ax2.plot(x_range, u_opt_np, label="Opt_Load", color="blue", linewidth=1)
+                        ax2.set_ylabel("Power")
+
+                        # Highlight peak price hours (assuming price > 1 means peak)
+                        for i, val in enumerate(price_signal):
+                            if val > 1:
+                                ax2.axvspan(i - 0.5, i + 0.5, color='orange', alpha=0.3)
+
+                        ax2.legend(fontsize=6, loc='upper right')
+
+                        # No x-labels as requested
+                        ax1.tick_params(labelbottom=False)
+                        plt.show()
+
+            else:
+                pass
+            train_loss = train_loss / len(control_loader.dataset)
+            temperature_loss = temperature_loss / len(control_loader.dataset)
+            price_loss = price_loss / len(control_loader.dataset)
+
+            train_losses.append(train_loss)
+            tr.set_postfix(epoch="{0:.0f}".format(epoch + 1), train_loss="{0:.6f}".format(train_loss),
+                           temperature_loss="{0:.6f}".format(temperature_loss),
+                           price_loss="{0:.6f}".format(price_loss))
+
+    return control_mdl
 
 

@@ -17,3 +17,16 @@ Fix bug due to parameter: "envelop_mdl",
 
 Vectorize calculation,speed improved by ~6 times.
 
+# 🧠 [3.0.0] 2025 June 11
+Update datadriven modnn
+RC based envelop_mdl really hard to tune on new dataset
+
+# 🧠 [3.0.1] 2025 June 11
+Add a step function for one step ahead prediction
+
+# 🧠 [3.0.2] 2025 June 11
+Fix bug for step function
+
+# 🧠 [3.0.3] 2025 June 11
+Fix bug for step function
+

@@ -57,7 +57,7 @@ class SolarRadiation(nn.Module):
         roof_gain = abs_roof_coef * radiation
         roof_gains = [roof_gain] * n_roof
 
-        return direct_gain, wall_gains, roof_gains
+        return direct_gain*0, wall_gains, roof_gains
 
 
 # --- Envelope Module [RC, R] ---
@@ -193,8 +193,6 @@ class ModNN(nn.Module):
 
         # Pre-allocate results arrays
         Tzone_pred = torch.zeros(batch_size, time_steps, 1, device=input_X.device)
-        q_int_pred = torch.zeros(batch_size, time_steps, 1, device=input_X.device)
-        q_hvac_pred = torch.zeros(batch_size, time_steps, 1, device=input_X.device)
         q_env_pred = torch.zeros(batch_size, time_steps, 1, device=input_X.device)
         q_solar_direct_pred = torch.zeros(batch_size, time_steps, 1, device=input_X.device)
 
@@ -238,13 +236,18 @@ class ModNN(nn.Module):
             q_env_pred[:, i:i + 1, :] = q_env_total
 
             # Envelope temperatures update
-            # Use RK4 if want higher accuracy
             for idx, dTmid_dt in enumerate(dTmid_dt_list):
-                # Clamp derivatives for stability
-                dTmid_dt_clamped = torch.clamp(dTmid_dt, -3.0 / self.delta_t, 3.0 / self.delta_t)
-                delta = torch.clamp(self.delta_t * dTmid_dt_clamped, -3.0, 3.0)
+                delta = self.delta_t * dTmid_dt
                 Tmid[idx] = Tmid[idx] + delta
                 Tmid_hist[idx][:, i:i + 1, :] = Tmid[idx]
+
+            # # Use RK4 if want higher accuracy
+            # for idx, dTmid_dt in enumerate(dTmid_dt_list):
+            #     # Clamp derivatives for stability
+            #     dTmid_dt_clamped = torch.clamp(dTmid_dt, -3.0 / self.delta_t, 3.0 / self.delta_t)
+            #     delta = torch.clamp(self.delta_t * dTmid_dt_clamped, -3.0, 3.0)
+            #     Tmid[idx] = Tmid[idx] + delta
+            #     Tmid_hist[idx][:, i:i + 1, :] = Tmid[idx]
 
         # --- Decoder phase (this is the actual prediction stage) ---
         Tzone = Tzone_gt[:, self.enc_len - 1:self.enc_len, :]
@@ -271,10 +274,15 @@ class ModNN(nn.Module):
             q_env_pred[:, idx:idx + 1, :] = q_env_total
 
             # Envelope temperatures update
+            # for j, dTmid_dt in enumerate(dTmid_dt_list):
+            #     # Clamp derivatives for stability
+            #     dTmid_dt_clamped = torch.clamp(dTmid_dt, -3.0 / self.delta_t, 3.0 / self.delta_t)
+            #     delta = torch.clamp(self.delta_t * dTmid_dt_clamped, -3.0, 3.0)
+            #     Tmid[j] = Tmid[j] + delta
+            #     Tmid_hist[j][:, idx:idx + 1, :] = Tmid[j]
+
             for j, dTmid_dt in enumerate(dTmid_dt_list):
-                # Clamp derivatives for stability
-                dTmid_dt_clamped = torch.clamp(dTmid_dt, -3.0 / self.delta_t, 3.0 / self.delta_t)
-                delta = torch.clamp(self.delta_t * dTmid_dt_clamped, -3.0, 3.0)
+                delta = self.delta_t * dTmid_dt
                 Tmid[j] = Tmid[j] + delta
                 Tmid_hist[j][:, idx:idx + 1, :] = Tmid[j]
 
@@ -283,8 +291,11 @@ class ModNN(nn.Module):
             # TODO: consider to integrated with Neural ODE
 
             # Update zone temperature with stability limits
-            dTzone_dt_clamped = torch.clamp(dTzone_dt, -2.0 / self.delta_t, 2.0 / self.delta_t)
-            delta = torch.clamp(self.delta_t * dTzone_dt_clamped, -2.0, 2.0)
+            # dTzone_dt_clamped = torch.clamp(dTzone_dt, -2.0 / self.delta_t, 2.0 / self.delta_t)
+            # delta = torch.clamp(self.delta_t * dTzone_dt_clamped, -2.0, 2.0)
+            # Tzone = Tzone + delta
+            # Tzone_pred[:, idx:idx + 1, :] = Tzone
+            delta = self.delta_t * dTzone_dt
             Tzone = Tzone + delta
             Tzone_pred[:, idx:idx + 1, :] = Tzone
 
@@ -341,7 +352,7 @@ class Internal(nn.Module):
     def forward(self, x):
         x1 = F.relu(self.FC1(x[:, :, :-1]))
         sch = torch.sigmoid(self.FC2(x1)) + x[:, :, -1:]
-        return F.softplus(self.gain) * 0.1 * sch
+        return F.softplus(self.gain) * 0.2 * sch
 
 
 # --- HVAC Module ---
@@ -361,8 +372,20 @@ class HVAC(nn.Module):
         self.gain = nn.Parameter(torch.tensor(0.1, dtype=torch.float32))
 
     def forward(self, x):
-        return (F.softplus(self.gain) * 0.1 * x)
+        return (F.softplus(self.gain) * 1 * x)
 
+# --- Affine Mapping Module ---
+class Affine(nn.Module):
+    """
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.affine = nn.Linear(1, 1)
+
+    def forward(self, x):
+        return self.affine(x)
 
 # --- Zone Heat Balance Module ---
 class ZoneUpdate(nn.Module):
@@ -376,6 +399,6 @@ class ZoneUpdate(nn.Module):
 
         # Add direct solar gain if provided
         if q_solar_direct is not None:
-            return (q_env_total + q_int + q_hvac + q_solar_direct) * c_inv_bounded
+            return (q_env_total + q_int*0 + q_hvac + q_solar_direct) * c_inv_bounded
         else:
             return (q_env_total + q_int + q_hvac) * c_inv_bounded

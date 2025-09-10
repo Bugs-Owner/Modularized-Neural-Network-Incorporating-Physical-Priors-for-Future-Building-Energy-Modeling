@@ -8,12 +8,12 @@ import numpy as np
 import torch
 import matplotlib.dates as dates
 import matplotlib.pyplot as plt
-from modnn.Models import ModNN_phy, BaseNN, ModNN_data
-from modnn.Play import train_model, test_model, check_model, dynamic_check_model, grad_model
+from modnn.Models import ModNN_phy, BaseNN, ModNN_data, PolicyNN
+from modnn.Play import train_model, test_model, check_model, dynamic_check_model, grad_model, control_model
 import matplotlib
 import seaborn as sns
+from scipy import stats
 from matplotlib.ticker import MaxNLocator
-
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
@@ -26,11 +26,10 @@ class Mod:
         self.args = args
         self.device = torch.device(self.args["device"] if torch.cuda.is_available() else "cpu")
 
-
-    def data_ready(self):
+    def data_ready(self, df=None):
         print('cook data')
         start_time = time.time()
-        DC = DataCook(args=self.args)
+        DC = DataCook(args=self.args, df=df)
         DC.cook()
         self.dataset = DC
         print("--- %s seconds ---" % (time.time() - start_time))
@@ -62,7 +61,8 @@ class Mod:
                                                 scale = self.args["scale"],
                                                 device=self.device,
                                                 ext_mdl = self.args["ext_mdl"],
-                                                envelop_mdl = self.args["envelop_mdl"],)
+                                                envelop_mdl = self.args["envelop_mdl"],
+                                                diff_alpha = self.args["para"]["diff_alpha"])
         print("--- %s seconds ---" % (time.time() - start_time))
 
         folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
@@ -263,8 +263,8 @@ class Mod:
             new_args = self.args.copy()
             new_args["datapath"] = testing_data_path
             new_args["scaler_load"] = True
-            new_args["startday"] = 30
-            new_args["trainday"] = 180
+            new_args["startday"] = 210
+            new_args["trainday"] = 567
             new_args["testday"] = 1
             DC_new = DataCook(args=new_args)
 
@@ -273,7 +273,11 @@ class Mod:
                 DC_new.scalers = self.dataset.scalers
             DC_new.load_data()
             DC_new.prepare_data_splits()
-            test_loader = DC_new._create_dataloader(data=DC_new.testingdf, batch_size=len(DC_new.testingdf), shuffle=False)
+            test_loader = DC_new._create_dataloader(data=DC_new.testingdf,
+                                                    batch_size=len(DC_new.testingdf),
+                                                    shuffle=False,
+                                                    en_len=self.args["enLen"],
+                                                    de_len=self.args["deLen"])[0]
 
             # Run test on the new testing dataset
             to_out, en_out, de_out = test_model(model=self.model,
@@ -306,12 +310,12 @@ class Mod:
         mae = {}
         mse = {}
         mape = {}
+        r2 = {}
 
-        gdtruth = (true_temps - 32) * 5 / 9 if self.args.get("temp_unit", "F") == "F" else true_temps
+        gdtruth = true_temps
 
         for timestep in range(test_len):
             tem = de_out[timestep]
-            tem = (tem - 32) * 5 / 9 if self.args.get("temp_unit", "F") == "F" else tem
             test_result[timestep] = tem
 
             # Calculate metrics for this timestep
@@ -321,18 +325,23 @@ class Mod:
             mae[timestep] = np.mean(np.abs(y_true - y_pred))
             mse[timestep] = np.mean((y_true - y_pred) ** 2)
             mape[timestep] = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+            ss_res = np.sum((y_true - y_pred) ** 2)
+            ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+            r2[timestep] = 1 - ss_res / ss_tot if ss_tot != 0 else 0.0
 
         # Store per-timestep metrics
         self.mae = mae
         self.mse = mse
         self.mape = mape
+        self.r2 = r2
 
         # Calculate overall metrics
         avg_metrics = {
             'MAPE': np.mean(list(mape.values())),
             'MAE': np.mean(list(mae.values())),
             'MSE': np.mean(list(mse.values())),
-            'RMSE': np.sqrt(np.mean(list(mse.values())))
+            'RMSE': np.sqrt(np.mean(list(mse.values()))),
+            'r2': np.mean(list(r2.values())),
         }
 
         # Print metrics
@@ -345,6 +354,7 @@ class Mod:
             'mae': mae,
             'mse': mse,
             'mape': mape,
+            'r2': r2,
             'summary': avg_metrics
         }
 
@@ -361,7 +371,7 @@ class Mod:
 
         print(f"--- {time.time() - start_time:.2f} seconds ---")
 
-        return avg_metrics
+        return metrics
 
     def check(self):
         print('Checking start')
@@ -394,32 +404,90 @@ class Mod:
         print("--- %s seconds ---" % (time.time() - start_time))
 
     def vio_eva(self):
-        vio = 0
+        vio = []
         test_len = len(self.de_out)
         _ = self.dynamic_temp[-4000]
         for u in [-2000, 0, 2000, 4000]:
             for timestep in range(len(self.de_out)):
                 td = _[timestep][:test_len - timestep] - self.dynamic_temp[u][timestep][:test_len - timestep]
-                vio += np.clip(td, 0, None).sum()
+                vio.append(np.clip(td, 0, None).sum())
                 _ = self.dynamic_temp[u]
         return vio, self.mae, self.train_log
 
-    def prediction_show(self):
+    def prediction_show(self, ylim=(20, 28)):
         print('Ploting start')
+        # One trajactory
         rawdf = self.dataset.test_raw_df
         test_len = len(self.de_out)
         pred_len = self.args['deLen']
         fig, ax = plt.subplots(1, 1, figsize=(6, 1.2), dpi=300, constrained_layout=True)
-        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len] - 32) * 5 / 9, '-',
+        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len]), '-',
+                     linewidth=1, color="#159A9C", label='Measurement')
+        mae_values = np.array(list(self.mae.values()))
+        mape_values = np.array(list(self.mape.values()))
+
+        # Take values at every 96th step
+        mae_every_96 = mae_values[::96]
+        mape_every_96 = mape_values[::96]
+
+        # Calculate mean of sampled values
+        mae = mae_every_96.mean()
+        mape = mape_every_96.mean()
+        for timestep in range(0, test_len, 96):
+            tem = self.de_out[timestep][:test_len - timestep]
+            ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
+                         tem, '--', linewidth=1, color="#EA7E7E")
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0])), '--', linewidth=1,
+                     color="#EA7E7E", label=self.args["modeltype"])
+
+        ax.text(0.01, 0.7, 'MAE:{:.2f}[°C]\nMAPE:{:.2f}[%]'.format(mae, mape), fontsize=6, color='gray',
+                fontweight='bold', transform=ax.transAxes)
+        ax.legend([], [], frameon=False)
+
+        ax.tick_params(axis='both', which='minor', labelsize=5)
+        ax.tick_params(axis='both', which='major', labelsize=6)
+        ax.xaxis.set_minor_locator(dates.HourLocator(interval=6))
+        ax.xaxis.set_minor_formatter(dates.DateFormatter("%H"))
+
+        def custom_date_formatter(x, pos):
+            dt = dates.num2date(x)  # Convert number to date
+            if pos == 0:  # Show the month only at the beginning
+                return dt.strftime('%b\n%d')
+            return dt.strftime('%d')  # Show only the day elsewhere
+
+        # Set up x-axis ticks
+        ax.xaxis.set_major_locator(dates.DayLocator(interval=1))
+        ax.xaxis.set_major_formatter(plt.FuncFormatter(custom_date_formatter))
+        ax.set_xlabel(None)
+
+        ax.set_ylim(*ylim)
+        y_min, y_max = ylim
+        y_range = y_max - y_min
+        if y_range <= 4:
+            step = 1
+        else:
+            step = 2
+        yticks = np.arange(np.ceil(y_min + 0.5), y_max, step)
+
+        ax.set_yticks(yticks)
+        ax.set_ylabel('Temperature[°C]', fontsize=7, fontweight='bold')
+        ax.margins(x=0)
+        ax.legend(loc='center', bbox_to_anchor=(0.5, 1.06), ncol=2, fontsize=7, frameon=False)
+        plt.show()
+        # All trajactory
+        rawdf = self.dataset.test_raw_df
+        test_len = len(self.de_out)
+        pred_len = self.args['deLen']
+        fig, ax = plt.subplots(1, 1, figsize=(6, 1.2), dpi=300, constrained_layout=True)
+        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len]), '-',
                      linewidth=1, color="#159A9C", label='Measurement')
         mae = np.array(list(self.mae.values())).mean()
         mape = np.array(list(self.mape.values())).mean()
         for timestep in range(test_len):
             tem = self.de_out[timestep][:test_len - timestep]
-            tem = (tem - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
                          tem, '--', linewidth=0.3, color="#EA7E7E")
-        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0]) - 32) * 5 / 9, '--', linewidth=1,
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0])), '--', linewidth=1,
                      color="#EA7E7E", label=self.args["modeltype"])
         ax.text(0.01, 0.7, 'MAE:{:.2f}[°C]\nMAPE:{:.2f}[%]'.format(mae, mape), fontsize=6, color='gray',
                 fontweight='bold', transform=ax.transAxes)
@@ -438,12 +506,17 @@ class Mod:
         # Set up x-axis ticks
         ax.xaxis.set_major_locator(dates.DayLocator(interval=1))
         ax.xaxis.set_major_formatter(plt.FuncFormatter(custom_date_formatter))
-
-        # ax.xaxis.set_major_locator(dates.DayLocator(interval=1))
-        # ax.xaxis.set_major_formatter(dates.DateFormatter('%b\n%d'))
         ax.set_xlabel(None)
-        # ax.set_ylim(21,27)
-        # ax.set_yticks(range(22,28,2))
+
+        ax.set_ylim(*ylim)
+        y_min, y_max = ylim
+        y_range = y_max - y_min
+        if y_range <= 4:
+            step = 1
+        else:
+            step = 2
+        yticks = np.arange(np.ceil(y_min + 0.5), y_max, step)
+
         ax.set_ylabel('Temperature[°C]', fontsize=7, fontweight='bold')
         ax.margins(x=0)
         ax.legend(loc='center', bbox_to_anchor=(0.5, 1.06), ncol=2, fontsize=7, frameon=False)
@@ -455,16 +528,15 @@ class Mod:
         test_len = len(self.de_out)
         pred_len = self.args['deLen']
         fig, axes = plt.subplots(2, 1, figsize=(2.84, 1.92*2), dpi=500, sharex='col', sharey='row', constrained_layout=True)
-        axes[0].plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len] - 32) * 5 / 9, '-',
+        axes[0].plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len]), '-',
                      linewidth=1, color="#159A9C", label='GroundTruth')
         axes[1].plot_date(rawdf.index[:test_len], (rawdf['phvac'].values[:test_len])/1000, '-',
                           linewidth=1, color="#159A9C", label='GroundTruth')
         for timestep in range(test_len):
             tem = self.de_out[timestep][:test_len - timestep]
-            tem = (tem - 32) * 5 / 9
             axes[0].plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
                          tem, '--', linewidth=0.3, color="gray")
-        axes[0].plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0]) - 32) * 5 / 9, '--', linewidth=1,
+        axes[0].plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0])), '--', linewidth=1,
                      color="gray", label=self.args["modeltype"])
 
         for timestep in [0]:
@@ -478,7 +550,6 @@ class Mod:
 
             for u in [-4000, -2000, 0, 2000, 4000]:
                 rand = self.dynamic_temp[u][timestep][:test_len - timestep]
-                rand = (rand - 32) * 5 / 9
                 axes[0].plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], rand, '--', linewidth=1,
                                   color=color_list[u], label='Phvac:{}kW'.format(u))
                 hvac = self.dynamic_hvac[u][timestep][:test_len - timestep]
@@ -521,23 +592,21 @@ class Mod:
 
         # PLot Temp check for paper
         fig, ax = plt.subplots(1, 1, figsize=(2.84, 1.92), dpi=500, constrained_layout=True)
-        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len] - 32) * 5 / 9, '-',
+        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_room'].values[:test_len]), '-',
                      linewidth=1, color="#159A9C", label='GroundTruth')
         for timestep in range(test_len):
             tem = self.de_out[timestep][:test_len - timestep]
-            tem = (tem - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
                          tem, '--', linewidth=0.5, color="gray")
-        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0]) - 32) * 5 / 9, '--', linewidth=1,
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0])), '--', linewidth=1,
                      color="gray", label=self.args["modeltype"])
 
         for timestep in [0]:
             minn = self.outputs_min_denorm[timestep][:test_len - timestep]
-            minn = (minn - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], minn, '--', linewidth=1,
                          color="#8163FD", label='Max Cooling')
             maxx = self.outputs_max_denorm[timestep][:test_len - timestep]
-            maxx = (maxx - 32) * 5 / 9
+
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], maxx, '--', linewidth=1,
                          color="#FF5F5D", label='Max Heating')
 
@@ -550,10 +619,8 @@ class Mod:
         #Temperature response violation
         for timestep in range(len(self.de_out)):
             minn = self.outputs_min_denorm[timestep][:test_len - timestep][0]
-            minn = (minn - 32) * 5 / 9
             maxx = self.outputs_max_denorm[timestep][:test_len - timestep][0]
-            maxx = (maxx - 32) * 5 / 9
-            y_pred = (self.de_out[timestep][:test_len - timestep]- 32) * 5 / 9
+            y_pred = (self.de_out[timestep][:test_len - timestep])
             y_pred = y_pred[0]
             vio1 += np.clip((minn - y_pred), 0, None)/4
             vio2 += np.clip((y_pred - maxx), 0, None)/4
@@ -593,23 +660,20 @@ class Mod:
 
         # PLot Temp check for paper
         fig, ax = plt.subplots(1, 1, figsize=(2.84, 1.92), dpi=500, constrained_layout=True)
-        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_zone_{}'.format(0)].values[:test_len] - 32) * 5 / 9, '-',
+        ax.plot_date(rawdf.index[:test_len], (rawdf['temp_zone_{}'.format(0)].values[:test_len]), '-',
                      linewidth=1, color="#159A9C", label='GroundTruth')
         for timestep in range(test_len):
             tem = self.de_out[timestep][:test_len - timestep]
-            tem = (tem - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep],
                          tem, '--', linewidth=0.5, color="gray")
-        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0]) - 32) * 5 / 9, '--', linewidth=1,
+        ax.plot_date(rawdf.index[0:0 + 1], ((self.de_out[0][0])), '--', linewidth=1,
                      color="gray", label=LB)
 
         for timestep in [0]:
             minn = self.outputs_min_denorm[timestep][:test_len - timestep]
-            minn = (minn - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], minn, '--', linewidth=1,
                          color="#8163FD", label='Max Cooling')
             maxx = self.outputs_max_denorm[timestep][:test_len - timestep]
-            maxx = (maxx - 32) * 5 / 9
             ax.plot_date(rawdf.index[timestep:timestep + pred_len][:test_len - timestep], maxx, '--', linewidth=1,
                          color="#FF5F5D", label='Max Heating')
 
@@ -622,10 +686,8 @@ class Mod:
         #Temperature response violation
         for timestep in range(len(self.de_out)):
             minn = self.outputs_min_denorm[timestep][:test_len - timestep][0]
-            minn = (minn - 32) * 5 / 9
             maxx = self.outputs_max_denorm[timestep][:test_len - timestep][0]
-            maxx = (maxx - 32) * 5 / 9
-            y_pred = (self.de_out[timestep][:test_len - timestep]- 32) * 5 / 9
+            y_pred = (self.de_out[timestep][:test_len - timestep])
             y_pred = y_pred[0]
             vio1 += np.clip((minn - y_pred), 0, None)/4
             vio2 += np.clip((y_pred - maxx), 0, None)/4
@@ -660,43 +722,130 @@ class Mod:
         fig.savefig(saveplot)
 
     def grad_check(self):
-        Joc_matrix_list = grad_model(model=self.model, test_loader=self.dataset.TestLoader, device=self.device)
+        Joc_matrix_list = grad_model(model=self.model,
+                                     test_loader=self.dataset.TestLoader,
+                                     device=self.device)
         Joc_matrix_ave = np.zeros_like(Joc_matrix_list[0])
         for l in range(len(Joc_matrix_list)):
             Joc_matrix_ave += Joc_matrix_list[l]
         Joc_matrix_ave = Joc_matrix_ave / len(Joc_matrix_list)
 
-        # Define the check terms and corresponding labels
         check_terms = {
             "HVAC": {"index": 6, "ylabel": "HVAC Power (Timestep)", "xlabel": "Zone Temp (Timestep)"},
             "OA": {"index": 1, "ylabel": "Outdoor Air Temp (Timestep)", "xlabel": "Zone Temp (Timestep)"},
             "Solar": {"index": 2, "ylabel": "Solar Radiation (Timestep)", "xlabel": "Zone Temp (Timestep)"},
             "Occ": {"index": 5, "ylabel": "Occupancy (Timestep)", "xlabel": "Zone Temp (Timestep)"}
         }
-
+        os.makedirs("jacobian_data", exist_ok=True)
+        np.save("jacobian_data/pimodnn.npy", Joc_matrix_ave)
         for name, meta in check_terms.items():
             grad_matrix = Joc_matrix_ave[:, :, [meta["index"]]].squeeze()
 
+            # --- Plot 1: Heatmap ---
             fig, ax = plt.subplots(1, 1, figsize=(2.84, 1.92), dpi=300, constrained_layout=True)
             heatmap = sns.heatmap(
                 grad_matrix[48:48 + 96, 48:48 + 96].T, ax=ax,
                 cmap=sns.color_palette("ch:s=-.2,r=.6", as_cmap=True),
                 cbar_kws={'label': None}
             )
-
             ax.set_ylabel(meta["ylabel"], fontsize=9)
             ax.set_xlabel(meta["xlabel"], fontsize=9)
             ax.tick_params(axis='both', which='both', labelsize=5)
-            ax.margins(x=0)
-
             cbar = heatmap.collections[0].colorbar
             cbar.ax.tick_params(labelsize=5)
             cbar.set_label('Gradient', size=9)
-
             plt.title(f'Jacobian Heatmap: {name}', fontsize=10)
-
             plt.savefig(f'96 Steps Jacobian Heatmap: {name}.png', dpi=300)
             plt.show()
+
+            # --- Plot 2: Gradient Distribution ---
+            grad_values = grad_matrix.flatten()
+            fig, ax = plt.subplots(1, 1, figsize=(2.84, 1.92), dpi=300, constrained_layout=True)
+            sns.histplot(grad_values, bins=30, kde=False, ax=ax)
+            ax.set_title(f'Gradient Distribution: {name}', fontsize=10)
+            ax.set_xlabel('Gradient Value', fontsize=9)
+            ax.set_ylabel('Count', fontsize=9)
+            ax.tick_params(axis='both', which='both', labelsize=5)
+            plt.savefig(f'96 Steps Jacobian Distribution: {name}.png', dpi=300)
+            plt.show()
+
+    def policy_train(self):
+        # Freeze dynamic model
+        dynamic_mdl = self.model
+        dynamic_mdl.train()
+        for param in dynamic_mdl.parameters():
+            param.requires_grad = False
+
+        # Policy model configuration
+        policy_mdl = PolicyNN.Policy(self.args).to(self.device)
+
+        # Policy model training
+        self.policy_mdl, self.policy_log = control_model(dynamic_mdl=dynamic_mdl,
+                                                         control_mdl=policy_mdl,
+                                                         control_loader=self.dataset.ControlLoader,
+                                                         args=self.args,
+                                                         test_loader =self.dataset.TestLoader,
+                                                         hvacscale=self.dataset.scalers['flux'])
+
+        # folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+        #                'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
+        # mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"], str(self.args["trainday"]),
+        #                                            self.dataset.test_start)
+        # if not os.path.exists(folder_name):
+        #     os.makedirs(folder_name)
+        # savemodel = os.path.join(folder_name, mdl_name)
+        # torch.save(model.state_dict(), savemodel)
+        #
+        # folder_name = ("../Saved/{}/Loss".format(self.args['save_name']) +
+        #                'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
+        # loss_name = '{}Loss{}days_Test_on{}.pickle'.format(self.args["modeltype"], str(self.args["trainday"]),
+        #                                                    self.dataset.test_start)
+        # if not os.path.exists(folder_name):
+        #     os.makedirs(folder_name)
+        # saveloss = os.path.join(folder_name, loss_name)
+        # with open(saveloss, 'wb') as f:
+        #     pickle.dump(self.train_log, f)
+        #
+        #
+        # self.control_mdl = control_model(dynamic_mdl=dynamic_mdl,
+        #                                  control_mdl=OptNN.SolNN(self.para).to(device),
+        #                                  train_loader=self.dataset.TrainLoader[0],
+        #                                  args = self.args,
+        #                                  device=self.device)
+        #
+        # folder_name = "../Saved/DPC_mdl/{}" + 'Enco{}_Deco{}'.format(self.args.build_name, str(self.dataset.enLen), str(self.dataset.deLen))
+        # mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args.modeltype, str(self.dataset.trainday), self.dataset.test_start)
+        # if not os.path.exists(folder_name):
+        #     os.makedirs(folder_name)
+        # savemodel = os.path.join(folder_name, mdl_name)
+        # torch.save(self.control_mdl.state_dict(), savemodel)
+
+    def step_mdl(self, mdl_name=None):
+        if "modnn" in self.args["modeltype"]:
+            if self.args["envelop_mdl"] == "physics":
+                model = ModNN_phy.ModNN(self.args).to(self.device)
+            else:
+                model = ModNN_data.ModNN_step(self.args).to(self.device)
+        if self.args["modeltype"] == "LSTM":
+            model = BaseNN.Baseline(self.args).to(self.device)
+
+        folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+                       'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
+        if mdl_name is None:
+            mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"],
+                                                       str(self.args["trainday"]),
+                                                       self.dataset.test_start)
+        else:
+            mdl_name = mdl_name
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        loadmodel = os.path.join(folder_name, mdl_name)
+        model.load_state_dict(torch.load(loadmodel))
+        model.eval()
+        self.model = model
+        return model
+
+
 
 
 

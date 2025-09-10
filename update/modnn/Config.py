@@ -5,24 +5,33 @@ def _paras(**kwargs):
     """
     para = {
         # Internal gain module
-        "Int_in": 3, "Int_h": 9, "Int_out": 1,
+        "Int_in": 3, "Int_h": 12, "Int_out": 1,
 
         # External disturbance module
-        "Ext_in": 5, "Ext_h": 18, "Ext_out": 1,
+        "Ext_in": 2, "Ext_h": 18, "Ext_out": 1,
 
         # Zone module
-        "Zone_in": 1, "Zone_out": 1,
+        "Zone_in": 1, "Zone_h": 12, "Zone_out": 1,
 
         # HVAC module
         "HVAC_in": 1, "HVAC_out": 1,
 
         # Look back window
         "window" : 1,
+        "diff_alpha": 0.3,
+        # LSTM baseline
+        "LSTM_h" : 24,
+
+        "current_meas_dim": 7,
+        "future_disturbance_dim": 6,
+        "horizon": 96,
+        "hidden_dim": 256,
+        "policy_epochs":200, "policy_lr":0.01,
 
         # Training hyperparameters
         "lr": 0.01,
-        "epochs": 50,
-        "patience": 20, #Early stop
+        "epochs": 30,
+        "patience": 6, #Early stop
     }
 
     # Allow override from kwargs
@@ -36,7 +45,7 @@ def _envelops(**kwargs):
     Accepts keyword arguments to override default values.
     #TODO: Pre-trained envelop library
     """
-    envelop = {"direct_coef":   0.1,
+    envelop = {"direct_coef": 0.1,
                "abs_wall_coef": 0.1,
                "abs_roof_coef": 0.1,
                "r_opaque_coef": 10,
@@ -44,9 +53,9 @@ def _envelops(**kwargs):
                "r_transparent_coef": 10,
                "c_zone": 1000,
                # Module assembly
-               "n_wall": 4,
-               "n_roof": 1,
-               "n_window": 2,
+               "n_wall": 1,
+               "n_roof": 0,
+               "n_window": 1,
                }
     # Allow override from kwargs
     envelop.update(kwargs)
@@ -65,24 +74,32 @@ def _args(**kwargs):
         "para": _paras(**para_overrides),
         "envelop": _envelops(**envelop_overrides),
         # Paths and device
-        "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_AC_off_2month.csv", #"../Dataset/EPlus.csv",
-        "device": "cuda:0",
-        "save_name": "Mid",
+        #/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_noAC.csv---EPlus_train_AC_off_2month
+        # "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_AC_off_2month.csv", #"../Dataset/EPlus.csv",
+        # "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_case1.csv",
+        # "datapath": "/home/zjiang19/Documents/GitHub/Physical-Incorporated-Neural-Network-BEM/update/403_new_dyn.csv",
+        "datapath": "/home/zjiang19/Documents/GitHub/ModNN-RL-403/dataset/Data_Process/data_coe_update.csv",
+        # "datapath":"/home/zjiang19/Documents/GitHub/BEST_OPT/dataset/dataset_1.csv",
+        "device": "cuda:1",
+        "save_name": "Eplus",
 
         # Data settings
+        "use_data_cleaning": True,
+        "tolerance_hours": 1,
         "resolution": 15, # 15 minutes data
         "enLen": 48, # "Kind of warm-up"
         "deLen": 96, # Prediction horizon, 96 is for 24 hours
-        "startday": 30, # Training data selection
+        "startday": 384, # Training data selection
         "trainday": 180, # Training data selection
         "testday": 1, # Testing data selection
         "training_batch": 1024*1,
-        "envelop_mdl": "physics", # We provide "physics" and "datadriven"
+        "multi_deLen": [4, 8, 16, 24, 32, 48],
+        "envelop_mdl": "datadriven", # We provide "physics" and "datadriven"
                                   # "physics" rely on heatbalance equation, "datadriven" is a blackbox
-        "ext_mdl": "LSTM", # We provide LSTM and RNN module, for RNN, we can apply positive constraint easily
+        "ext_mdl": "RNN", # We provide LSTM and RNN module, for RNN, we can apply positive constraint easily
                            # But LSTM has Hadamard product, making this constraint hard to integrate
                            # However, disturbance variables always have similiar distribution, in other word, is this constraint really necessary?
-        "plott": '-all', # all: If want to see how model response to max heating/cooling; else: only Tzone prediction
+        "plott": 'all', # all: If want to see how model response to max heating/cooling; else: only Tzone prediction
         "modeltype": 'PI-modnn', # We also have "LSTM", "PI-modnn", "PI-modnn|C", "PI-modnn|L", "PI-modnn|LC" for fun
                                  # LSTM is the baseline, |C means no constraints, |L means no loss adjustment
         "scale": 1, # scaling factor for HVAC power
@@ -93,7 +110,10 @@ def _args(**kwargs):
             {
              "temp": None,  # For example (50, 120) Temperature(°F)
              "flux": None  # For example (-5000, 5000) Power(W)
-            }
+            },
+        #Policy NN Args
+
+        "control_mode": "Both",
 
     }
 

@@ -23,16 +23,19 @@ class Baseline(nn.Module):
 
     def __init__(self, args):
         super().__init__()
+        self.LSTM_h=args["para"]["LSTM_h"]
         self.encoLen = args["enLen"]
         self.decoder = LSTM(input_size= 6,
-                            hidden_size=24,
+                            hidden_size=self.LSTM_h,
                             output_size=1)
         self.device = args['device']
 
     def forward(self, input_X):
         Decoder_X = input_X[:, self.encoLen:, [1, 2, 3, 4, 5, 6]]
         Current_X_zone = input_X[:, self.encoLen:self.encoLen + 1, [0]]
-        outputs, _ = self.decoder(Decoder_X, (Current_X_zone.reshape(1, Decoder_X.shape[0], 1).repeat(1, 1, 24),
-                                              Current_X_zone.reshape(1, Decoder_X.shape[0], 1).repeat(1, 1, 24)))
-
-        return torch.cat((input_X[:, :self.encoLen, [0]], outputs), 1), torch.cat((input_X[:, :self.encoLen, [0]], outputs), 1),torch.cat((input_X[:, :self.encoLen, [0]], outputs), 1)
+        outputs, _ = self.decoder(Decoder_X, (Current_X_zone.reshape(1, Decoder_X.shape[0], 1).repeat(1, 1, self.LSTM_h),
+                                              Current_X_zone.reshape(1, Decoder_X.shape[0], 1).repeat(1, 1, self.LSTM_h)))
+        # repeat to match the util code
+        return (torch.cat((input_X[:, :self.encoLen, [0]], outputs), 1),
+                torch.cat((input_X[:, :self.encoLen, [0]], outputs), 1),
+                torch.cat((input_X[:, :self.encoLen, [0]], outputs), 1))

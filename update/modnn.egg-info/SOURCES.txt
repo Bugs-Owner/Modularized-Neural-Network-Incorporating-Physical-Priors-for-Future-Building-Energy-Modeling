@@ -5,6 +5,7 @@ modnn/Config.py
 modnn/Dataset.py
 modnn/Play.py
 modnn/__init__.py
+modnn/hyper_tune.py
 modnn/run.py
 modnn/utils.py
 modnn.egg-info/PKG-INFO
@@ -15,4 +16,6 @@ modnn.egg-info/top_level.txt
 modnn/Models/BaseNN.py
 modnn/Models/ModNN_data.py
 modnn/Models/ModNN_phy.py
+modnn/Models/ModNN_phy_back.py
+modnn/Models/PolicyNN.py
 modnn/Models/__init__.py
