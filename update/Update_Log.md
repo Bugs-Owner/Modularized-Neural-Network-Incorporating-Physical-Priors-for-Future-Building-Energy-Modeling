@@ -34,3 +34,7 @@ Fix bug for step function
 Didn't work on it for 3 months, just update the latest version
 Will use it for BESTOpt building dynamic model
 
+# 🧠 [3.0.5] 2025 Sept 15
+3.0.4 CAN-NOT work at all, I mistakenly comment one line and add a new line of code
+3.0.5 is GOOD, will use it for BESTOpt dynamic modeling
+

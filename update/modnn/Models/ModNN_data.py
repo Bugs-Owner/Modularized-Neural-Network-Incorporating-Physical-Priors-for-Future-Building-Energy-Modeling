@@ -326,7 +326,7 @@ class ModNN(nn.Module):
             else:
                 ext_flux, (ext_hidd, ext_cell) = self.Ext(ext_embed, (ext_hidd, ext_cell))
 
-            ext_flux, _ = self.Ext(ext_embed, None)
+            # ext_flux, _ = self.Ext(ext_embed, None)
             hvac_flux = self.HVAC(HVAC_X[:, i:i+1, :])
             int_flux = self.Int(Int_X[:, i:i+1, :])
             total_flux = ext_flux  + int_flux+ hvac_flux

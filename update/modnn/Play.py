@@ -150,7 +150,6 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                             model.Int.scale.weight.data.clamp_(0)
                             model.HVAC.scale.weight.data.clamp_(0)
 
-
                             # model.Ext.conduction.weight.data.clamp_(0)
                             if ext_mdl == 'RNN':
                                 model.Ext.rnn.weight_ih_l0.data.clamp_(0)
