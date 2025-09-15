@@ -92,7 +92,10 @@ class DataCook:
         else:
             try:
                 self.df = pd.read_csv(self.args["datapath"], index_col=[0])
-                self.df['temp_room'] = (self.df['temp_room']-32)*5/9
+                # Temperature unit convert
+                if self.args["temp_unit"] == "F":
+                    self.df['temp_amb'] = (self.df['temp_amb'] - 32) * 5 / 9
+                    self.df['temp_room'] = (self.df['temp_room'] - 32) * 5 / 9
 
             except:
                 print("Input error")
@@ -118,12 +121,12 @@ class DataCook:
         # Generate setpt_cool and setpt_heat if missing
         occupied = (self.df.index.hour <= 8) | (self.df.index.hour >= 17)
         if "setpt_cool" not in self.df.columns:
-            self.df["setpt_cool"] = 75  # default occupied cooling setpoint
-            self.df.loc[~occupied, "setpt_cool"] += 8  # apply 8°F setback when unoccupied
+            self.df["setpt_cool"] = 25  # default occupied cooling setpoint
+            self.df.loc[~occupied, "setpt_cool"] += 4  # apply 4°C setback when unoccupied
 
         if "setpt_heat" not in self.df.columns:
-            self.df["setpt_heat"] = 70  # default occupied heating setpoint
-            self.df.loc[~occupied, "setpt_heat"] -= 8  # apply 8°F setback when unoccupied
+            self.df["setpt_heat"] = 20  # default occupied heating setpoint
+            self.df.loc[~occupied, "setpt_heat"] -= 4  # apply 4°C setback when unoccupied
 
         # Generate price if missing
         if "price" not in self.df.columns:

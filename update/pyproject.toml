@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "modnn"
-version = "3.0.4"
+version = "3.0.6"
 description = "Physics-Informed Modularized Neural Network for Building Energy Modeling"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -31,6 +31,3 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 mypackage = ["*.md"]
-
-[tool.setuptools.data-files]
-"." = ["Update_Log.md"]
