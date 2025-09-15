@@ -60,6 +60,8 @@ Will use it for BESTOpt building dynamic model
 # 🧠 [3.0.6] 2025 Sept 15
 Fix temperature unit conversion issue
 
+# 🧠 [3.0.7] 2025 Sept 15
+Fix step model zone module dimension issue
 
 ## 🧪 Requirements
 

@@ -359,8 +359,8 @@ class ModNN_step(nn.Module):
         self.ext_mdl = args["ext_mdl"]
 
         self.Ext = external(para["Ext_in"], para["Ext_h"], para["Ext_out"], self.ext_mdl, para["window"])
-        # self.Zone = zone(para["Zone_in"], para["Zone_out"])
-        self.Zone = zone(para["Zone_in"], para["Zone_h"], para["Zone_out"])
+        self.Zone = zone(para["Zone_in"], para["Zone_out"])
+        # self.Zone = zone(para["Zone_in"], para["Zone_h"], para["Zone_out"])
         self.HVAC = hvac(para["HVAC_in"], para["HVAC_out"])
         self.Int = internal(para["Int_in"], para["Int_h"], para["Int_out"])
 

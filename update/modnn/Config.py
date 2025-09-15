@@ -76,11 +76,11 @@ def _args(**kwargs):
         # Paths and device
         #/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_noAC.csv---EPlus_train_AC_off_2month
         # "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_AC_off_2month.csv", #"../Dataset/EPlus.csv",
-        "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_case1.csv",
+        # "datapath": "/home/zjiang19/Documents/GitHub/Eplus_ModNN_Compare/dataset/Eplus/EPlus_train_case1.csv",
         # "datapath": "/home/zjiang19/Documents/GitHub/Physical-Incorporated-Neural-Network-BEM/update/403_new_dyn.csv",
         # "datapath": "/home/zjiang19/Documents/GitHub/ModNN-RL-403/dataset/Data_Process/data_coe_update.csv",
         # "datapath":"/home/zjiang19/Documents/GitHub/BEST_OPT/dataset/dataset_1.csv",
-        # "datapath": "/home/zjiang19/Documents/GitHub/BEST_OPT/bestopt/data/SFH/BLDG/clean/SFH_1.csv",
+        "datapath": "/home/zjiang19/Documents/GitHub/BEST_OPT/bestopt/data/SFH/BLDG/clean/SFH_1.csv",
         "device": "cuda:1",
         "save_name": "Eplus",
 
@@ -101,10 +101,10 @@ def _args(**kwargs):
                            # But LSTM has Hadamard product, making this constraint hard to integrate
                            # However, disturbance variables always have similiar distribution, in other word, is this constraint really necessary?
         "plott": 'all', # all: If want to see how model response to max heating/cooling; else: only Tzone prediction
-        "modeltype": 'PI-modnn|L', # We also have "LSTM", "PI-modnn", "PI-modnn|C", "PI-modnn|L", "PI-modnn|LC" for fun
+        "modeltype": 'PI-modnn', # We also have "LSTM", "PI-modnn", "PI-modnn|C", "PI-modnn|L", "PI-modnn|LC" for fun
                                  # LSTM is the baseline, |C means no constraints, |L means no loss adjustment
         "scale": 1, # scaling factor for HVAC power
-        "temp_unit": "F",
+        "temp_unit": "C",
         "scaler_save_name": "ModNN_scaler.pkl", # scaler name you want to save
         "scaler_load": None, # load previous scaler
         "user_defined_minmax": # user defined minmax for data scaling
