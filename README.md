@@ -36,11 +36,31 @@ We introduce physical consistency constraints to ensure the model responds appro
 We connect different modules based on physical typology, allowing for multiple-building applications through model sharing and inheritance.
 
 ## Instruction: 
-Step 1: Change your dataset to fit the column name
+```bash
+pip install modnn
+```
+```python
+from modnn import get_config, Mod
 
-Step 2: Run run.py file
+args = get_config({"datapath": "your_data.csv"}, preset="consistent")
+model = Mod(args)
+model.data_ready()
+model.train()
+model.load()
+model.test()
+```
+Your CSV needs a datetime index and the columns `temp_room`, `temp_amb`, `solar`, `occ` and `phvac`
+(examples in `update/example_data`). The package source is in `update/`.
 
-Done! Yes, you only need two steps. More detailed information coming soon~
+**Which model to use?** Creating a model prints a short note on what it guarantees.
+
+| preset | use it for | physically consistent responses |
+| --- | --- | --- |
+| `"consistent"` (recommended) | control, optimisation, what-if studies | HVAC, internal gains, outdoor temperature and solar |
+| `"accurate"` (as in 1.0.1) | pure forecasting, lowest error | HVAC only |
+| `"strict"` | when consistency must be guaranteed by construction | all inputs, at every horizon |
+
+See `update/README.md` for details.
 
 ## Publication: 
 Zixin Jiang, Bing Dong,

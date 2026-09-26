@@ -79,13 +79,14 @@ class EarlyStopping:
 
 def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 patience, tempscal, fluxscal, enlen, delen,
-                rawdf, plott, modeltype, scale, device, ext_mdl, envelop_mdl, diff_alpha):
+                rawdf, plott, modeltype, scale, device, ext_mdl, envelop_mdl, diff_alpha,
+                checkpoint_dir="../Checkpoint"):
     num_update = 0
     total_time = 0
     time_every_update = {}
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     MSE_criterion = nn.MSELoss()
-    early_stopping = EarlyStopping(patience=patience, verbose=True)
+    early_stopping = EarlyStopping(patience=patience, verbose=True, path=checkpoint_dir)
     train_total_losses, train_temp_losses, train_diff_losses = [], [], []
     valid_losses = []
     vio_positive_loss = []
@@ -141,23 +142,8 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                     optimizer.step()
 
                     if Phy_cons==1:
-                        try:
-                            # Positive Hard Constraints
-                            model.Zone.scale.weight.data.clamp_(0)
-                            # model.Zone.dym.weight_ih_l0.data.clamp_(0)
-                            # model.Zone.dym.weight_hh_l0.data.clamp_(0)
-                            # model.Zone.fc.weight.data.clamp_(0)
-                            model.Int.scale.weight.data.clamp_(0)
-                            model.HVAC.scale.weight.data.clamp_(0)
-
-                            # model.Ext.conduction.weight.data.clamp_(0)
-                            if ext_mdl == 'RNN':
-                                model.Ext.rnn.weight_ih_l0.data.clamp_(0)
-                                model.Ext.rnn.weight_hh_l0.data.clamp_(0)
-                            else:
-                                pass
-                        except:
-                            pass
+                        # Positive hard constraints (and envelope sign constraints, see args["consistency"])
+                        model.apply_constraints()
                     time_elapsed = time.time() - time_start
                     total_time += time_elapsed
                     num_update += 1
@@ -392,7 +378,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                 break
 
         # load the last checkpoint with the best model
-        model.load_state_dict(torch.load("../Checkpoint/best.pt"))
+        model.load_state_dict(torch.load(early_stopping.savemodel))
 
         train_log = {
             'train_total_losses': train_total_losses,

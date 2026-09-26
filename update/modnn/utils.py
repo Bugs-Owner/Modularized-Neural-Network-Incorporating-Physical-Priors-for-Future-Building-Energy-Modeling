@@ -8,7 +8,8 @@ import numpy as np
 import torch
 import matplotlib.dates as dates
 import matplotlib.pyplot as plt
-from modnn.Models import ModNN_phy, BaseNN, ModNN_data, PolicyNN
+from modnn.Models import ModNN_phy, BaseNN, ModNN_data, ModNN_v1, PolicyNN
+from modnn.Config import describe
 from modnn.Play import train_model, test_model, check_model, dynamic_check_model, grad_model, control_model
 import matplotlib
 import seaborn as sns
@@ -25,6 +26,8 @@ class Mod:
         self.para = None
         self.args = args
         self.device = torch.device(self.args["device"] if torch.cuda.is_available() else "cpu")
+        self.out_dir = self.args.get("output_dir", "..")
+        print(describe(self.args))
 
     def data_ready(self, df=None):
         print('cook data')
@@ -38,6 +41,8 @@ class Mod:
         if "modnn" in self.args["modeltype"]:
             if self.args["envelop_mdl"] == "physics":
                 model = ModNN_phy.ModNN(self.args).to(self.device)
+            elif self.args.get("architecture", "v3") == "v1":
+                model = ModNN_v1.ModNN(self.args).to(self.device)
             else:
                 model = ModNN_data.ModNN(self.args).to(self.device)
         if self.args["modeltype"] == "LSTM":
@@ -62,10 +67,11 @@ class Mod:
                                                 device=self.device,
                                                 ext_mdl = self.args["ext_mdl"],
                                                 envelop_mdl = self.args["envelop_mdl"],
-                                                diff_alpha = self.args["para"]["diff_alpha"])
+                                                diff_alpha = self.args["para"]["diff_alpha"],
+                                                checkpoint_dir = self.out_dir + "/Checkpoint")
         print("--- %s seconds ---" % (time.time() - start_time))
 
-        folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+        folder_name = (self.out_dir + "/Saved/{}/Trained_mdl".format(self.args['save_name']) +
                        'Enco{}_Deco{}'.format(str(self.args['enLen']),str(self.args['deLen'])))
         mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"], str(self.args["trainday"]), self.dataset.test_start)
         if not os.path.exists(folder_name):
@@ -73,7 +79,7 @@ class Mod:
         savemodel = os.path.join(folder_name, mdl_name)
         torch.save(model.state_dict(), savemodel)
 
-        folder_name = ("../Saved/{}/Loss".format(self.args['save_name']) +
+        folder_name = (self.out_dir + "/Saved/{}/Loss".format(self.args['save_name']) +
                        'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
         loss_name = '{}Loss{}days_Test_on{}.pickle'.format(self.args["modeltype"], str(self.args["trainday"]), self.dataset.test_start)
         if not os.path.exists(folder_name):
@@ -144,12 +150,14 @@ class Mod:
         if "modnn" in self.args["modeltype"]:
             if self.args["envelop_mdl"] == "physics":
                 model = ModNN_phy.ModNN(self.args).to(self.device)
+            elif self.args.get("architecture", "v3") == "v1":
+                model = ModNN_v1.ModNN(self.args).to(self.device)
             else:
                 model = ModNN_data.ModNN(self.args).to(self.device)
         if self.args["modeltype"] == "LSTM":
             model = BaseNN.Baseline(self.args).to(self.device)
 
-        folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+        folder_name = (self.out_dir + "/Saved/{}/Trained_mdl".format(self.args['save_name']) +
                        'Enco{}_Deco{}'.format(str(self.args['enLen']),str(self.args['deLen'])))
         if mdl_name is None:
             mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"],
@@ -196,7 +204,7 @@ class Mod:
 
         return metrics
 
-    def _save_results(self, metrics, test_result, folder_prefix="../Result", is_new_data=False):
+    def _save_results(self, metrics, test_result, folder_prefix=None, is_new_data=False):
         """
         Save test results
 
@@ -213,9 +221,10 @@ class Mod:
             else:
                 data_desc = "new_data"
         else:
-            data_desc = f"Train_with_{self.args['trainday']}days\\nTest_on{self.dataset.test_start}"
+            data_desc = f"Train_with_{self.args['trainday']}days_Test_on{self.dataset.test_start}"
 
         # Create folder if it doesn't exist
+        folder_prefix = folder_prefix or self.out_dir + "/Result"
         folder_name = (f"{folder_prefix}/{self.args['save_name']}/{self.args['modeltype']}/" +
                        f'Enco{self.args["enLen"]}_Deco{self.args["deLen"]}')
         if not os.path.exists(folder_name):
@@ -583,7 +592,7 @@ class Mod:
         axes[1].set_ylabel('HVAC Power[kW]', fontsize=9)
         axes[1].margins(x=0)
         plt.show()
-        folder = '../Saved/Checking_Image/{}_{}'.format(rawdf.index[0].month, rawdf.index[0].day)
+        folder = self.out_dir + '/Saved/Checking_Image/{}_{}'.format(rawdf.index[0].month, rawdf.index[0].day)
         if not os.path.exists(folder):
             os.makedirs(folder)
         plot_name = 'Temp[{} to {}].pdf'.format(self.dataset.test_start, self.dataset.test_end)
@@ -714,7 +723,7 @@ class Mod:
         # ax.set_yticks(np.arange(8, 32, 5))
         # ax.set_ylim(10, 30)
         plt.close()
-        folder = '../Saved/Overall'
+        folder = self.out_dir + '/Saved/Overall'
         if not os.path.exists(folder):
             os.makedirs(folder)
         plot_name = 'Temp[{}].png'.format(self.dataset.test_raw_df.index[0])
@@ -787,7 +796,7 @@ class Mod:
                                                          test_loader =self.dataset.TestLoader,
                                                          hvacscale=self.dataset.scalers['flux'])
 
-        # folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+        # folder_name = (self.out_dir + "/Saved/{}/Trained_mdl".format(self.args['save_name']) +
         #                'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
         # mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"], str(self.args["trainday"]),
         #                                            self.dataset.test_start)
@@ -796,7 +805,7 @@ class Mod:
         # savemodel = os.path.join(folder_name, mdl_name)
         # torch.save(model.state_dict(), savemodel)
         #
-        # folder_name = ("../Saved/{}/Loss".format(self.args['save_name']) +
+        # folder_name = (self.out_dir + "/Saved/{}/Loss".format(self.args['save_name']) +
         #                'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
         # loss_name = '{}Loss{}days_Test_on{}.pickle'.format(self.args["modeltype"], str(self.args["trainday"]),
         #                                                    self.dataset.test_start)
@@ -829,7 +838,7 @@ class Mod:
         if self.args["modeltype"] == "LSTM":
             model = BaseNN.Baseline(self.args).to(self.device)
 
-        folder_name = ("../Saved/{}/Trained_mdl".format(self.args['save_name']) +
+        folder_name = (self.out_dir + "/Saved/{}/Trained_mdl".format(self.args['save_name']) +
                        'Enco{}_Deco{}'.format(str(self.args['enLen']), str(self.args['deLen'])))
         if mdl_name is None:
             mdl_name = '{}_{}daysTest_on{}.pth'.format(self.args["modeltype"],

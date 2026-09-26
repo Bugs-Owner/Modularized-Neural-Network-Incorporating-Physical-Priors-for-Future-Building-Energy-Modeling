@@ -82,7 +82,7 @@ class DataCook:
         self.df = df
         self.processed_data = None
         self.scalers = None
-        folder_name = "../Scaler/{}".format(self.args['save_name'])
+        folder_name = os.path.join(self.args.get("output_dir", ".."), "Scaler", self.args['save_name'])
         self.scaler_path = os.path.join(folder_name, self.scaler_save_name)
 
     def load_data(self):
@@ -90,15 +90,19 @@ class DataCook:
         if self.df is not None:
             pass
         else:
-            try:
-                self.df = pd.read_csv(self.args["datapath"], index_col=[0])
-                # Temperature unit convert
-                if self.args["temp_unit"] == "F":
-                    self.df['temp_amb'] = (self.df['temp_amb'] - 32) * 5 / 9
-                    self.df['temp_room'] = (self.df['temp_room'] - 32) * 5 / 9
-
-            except:
-                print("Input error")
+            if not self.args.get("datapath"):
+                raise ValueError('No data: set args["datapath"] to a CSV file or call data_ready(df) with a DataFrame')
+            if not os.path.exists(self.args["datapath"]):
+                raise FileNotFoundError("Data file not found: {}".format(self.args["datapath"]))
+            self.df = pd.read_csv(self.args["datapath"], index_col=[0])
+            # Temperature unit convert
+            if self.args["temp_unit"] == "F":
+                self.df['temp_amb'] = (self.df['temp_amb'] - 32) * 5 / 9
+                self.df['temp_room'] = (self.df['temp_room'] - 32) * 5 / 9
+        missing = [c for c in ["temp_room", "temp_amb", "solar", "occ", "phvac"] if c not in self.df.columns]
+        if missing:
+            raise ValueError("Data is missing required columns {} (need temp_room, temp_amb, solar, occ, phvac)"
+                             .format(missing))
 
         self._parse_time_index()
         self._generate_time_features()
@@ -196,7 +200,7 @@ class DataCook:
             self.scalers = scalers
 
             # Save newly created scalers
-            folder_name = "../Scaler/{}".format(self.args['save_name'])
+            folder_name = os.path.join(self.args.get("output_dir", ".."), "Scaler", self.args['save_name'])
             if not os.path.exists(folder_name):
                 os.makedirs(folder_name)
             scaler_path = os.path.join(folder_name, self.scaler_save_name)

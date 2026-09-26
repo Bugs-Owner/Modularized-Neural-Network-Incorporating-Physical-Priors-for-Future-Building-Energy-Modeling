@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+modnn_output/
+Saved/
+Result/
+Scaler/
+Checkpoint/
+build/
+dist/
+*.egg-info/

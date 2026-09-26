@@ -159,8 +159,15 @@ class external(nn.Module):
     And can be seperated into different sub-modules, please select case by case
     """
 
-    def __init__(self, input_size, hidden_size, output_size, model_type, window, num_layers=1):
+    def __init__(self, input_size, hidden_size, output_size, model_type, window, num_layers=1,
+                 ext_input="state"):
         super(external, self).__init__()
+        # ext_input: "state" feeds [T_zone, T_ambient]; "delta" feeds (T_ambient - T_zone)
+        self.ext_input = ext_input
+        input_size = 1 if ext_input == "delta" else input_size
+        # Sign of each input's effect on the envelope heat gain: warmer room -> less gain, warmer outside -> more
+        self.register_buffer("in_sign", torch.tensor([1.0] if ext_input == "delta" else [-1.0, 1.0]))
+        self.model_type = model_type
         if model_type == "RNN":
             self.ext_mdl = nn.RNN(input_size=input_size, hidden_size=hidden_size,
                                           num_layers=num_layers, batch_first=True, bias=True)
@@ -181,7 +188,11 @@ class external(nn.Module):
     def forward(self, x_input, hidden_state):
         # Need more work to explore weather we input the deltaT or just Tamb and Tspace toghether
         # ext_mdl_out, hidden = self.ext_mdl((x_input[:, :, [1]] - x_input[:, :, [0]]), hidden_state)
-        ext_mdl_out, hidden = self.ext_mdl((x_input[:, :, [0,1]]), hidden_state)
+        if self.ext_input == "delta":
+            ext_in = x_input[:, :, [1]] - x_input[:, :, [0]]
+        else:
+            ext_in = x_input[:, :, [0, 1]]
+        ext_mdl_out, hidden = self.ext_mdl(ext_in, hidden_state)
         last_output = ext_mdl_out[:, -1:, :]
         out = self.relu(self.fc1(last_output))
         out = self.fc2(out)
@@ -191,6 +202,49 @@ class external(nn.Module):
         solargain = torch.tanh(self.solar2(solargain))
 
         return out, hidden+solargain.permute(1, 0, 2)
+
+    @torch.no_grad()
+    def apply_constraints(self):
+        """
+        Partial physical consistency: the envelope heat gain rises with ambient temperature and solar
+        radiation and falls with zone temperature, at every step. Requires a plain RNN (tanh), since
+        the gates of LSTM/GRU multiply signed states and break monotonicity.
+        """
+        rnn = self.ext_mdl
+        rnn.weight_ih_l0.copy_(rnn.weight_ih_l0.abs() * self.in_sign)   # fix the sign of each input
+        rnn.weight_hh_l0.clamp_(0)
+        for layer in (self.fc1, self.fc2, self.solar1, self.solar2):
+            layer.weight.clamp_(0)
+
+
+class external_monotone(external):
+    """
+    Strictly physically consistent envelope (a monotone, "cooperative" system, like an RC network):
+        q_ext = a * T_ambient - c * T_zone + g(h),   h = RNN(T_zone, T_ambient, solar) >= 0 weights
+    with a, c >= 0, non-negative weights in g and the RNN, and zone_scale * c <= 1 (enforced in ModNN).
+    Each step is then non-decreasing in zone temperature, hidden state and every heat input, so more
+    heat in (ambient, solar, internal, HVAC) can never lower the predicted temperature at any horizon.
+    The hidden state plays the role of the envelope's thermal mass.
+    """
+
+    def __init__(self, input_size, hidden_size, output_size, model_type, window, num_layers=1):
+        super().__init__(input_size, hidden_size, output_size, model_type, window, num_layers, "state")
+        self.in_sign.fill_(1.0)                     # mass warms with both zone and ambient temperature
+        self.a = nn.Parameter(torch.tensor(0.1))    # ambient coupling
+        self.c = nn.Parameter(torch.tensor(0.1))    # zone heat loss
+
+    def forward(self, x_input, hidden_state):
+        out, hidden = super().forward(x_input, hidden_state)
+        conduction = self.a * x_input[:, -1:, [1]] - self.c * x_input[:, -1:, [0]]
+        return out + conduction, hidden
+
+    @torch.no_grad()
+    def apply_constraints(self, zone_scale=None):
+        super().apply_constraints()
+        self.a.clamp_(0)
+        self.c.clamp_(0)
+        if zone_scale is not None and zone_scale > 0:
+            self.c.clamp_(max=1.0 / zone_scale)     # keeps each step monotone in zone temperature
 
 class external_CNN(nn.Module):
     """
@@ -227,12 +281,33 @@ class ModNN(nn.Module):
         self.device  = args['device']
         self.window  = para["window"]
         self.ext_mdl = args["ext_mdl"]
+        # consistency: "none"    no constraint on the envelope module (previous behaviour)
+        #              "partial" envelope gain rises with ambient/solar and falls with zone temperature
+        #              "strict"  every response has the physical sign at every horizon (monotone model)
+        self.consistency = args.get("consistency", "none")
+        if self.consistency != "none" and self.ext_mdl != "RNN":
+            raise ValueError("consistency '{}' needs ext_mdl='RNN'".format(self.consistency))
         # self.Ext = external_CNN(input_channels=3, kernel_size=para["window"])
-        self.Ext = external(para["Ext_in"], para["Ext_h"], para["Ext_out"], self.ext_mdl, para["window"])
+        if self.consistency == "strict":
+            self.Ext = external_monotone(para["Ext_in"], para["Ext_h"], para["Ext_out"], self.ext_mdl, para["window"])
+        else:
+            self.Ext = external(para["Ext_in"], para["Ext_h"], para["Ext_out"], self.ext_mdl, para["window"],
+                                ext_input=args.get("ext_input", "state"))
         self.Zone = zone(para["Zone_in"], para["Zone_out"])
         self.HVAC = hvac(para["HVAC_in"], para["HVAC_out"])
         # self.Zone = zone(para["Zone_in"], para["Zone_h"], para["Zone_out"])
         self.Int = internal(para["Int_in"], para["Int_h"], para["Int_out"])
+
+    @torch.no_grad()
+    def apply_constraints(self):
+        """Hard physical constraints, applied after every optimizer step."""
+        self.Zone.scale.weight.clamp_(0)       # heat raises zone temperature
+        self.Int.scale.weight.clamp_(0)        # internal gains heat the zone
+        self.HVAC.scale.weight.clamp_(0)       # heating heats, cooling cools
+        if self.consistency == "partial":
+            self.Ext.apply_constraints()
+        elif self.consistency == "strict":
+            self.Ext.apply_constraints(zone_scale=float(self.Zone.scale.weight.max()))
 
     def forward(self, input_X):
         """

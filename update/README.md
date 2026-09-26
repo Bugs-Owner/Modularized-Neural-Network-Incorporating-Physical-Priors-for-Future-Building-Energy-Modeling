@@ -19,6 +19,39 @@ Please find the online Jupyter notebook for a step-by-step instruction:
 https://colab.research.google.com/drive/1A2jt1q53RtxGuaoym6N1PmlKELDPpYFX?usp=sharing
 
 
+## ⚡ Quick start
+Your CSV needs a datetime index and the columns `temp_room`, `temp_amb`, `solar`, `occ` and `phvac`.
+
+```python
+from modnn import get_config, Mod
+
+args = get_config({"datapath": "your_data.csv"}, preset="consistent")
+model = Mod(args)        # prints a short note on what this setting guarantees
+model.data_ready()       # or model.data_ready(df) with a pandas DataFrame
+model.train()
+model.load()
+model.test()
+```
+
+or from the command line: `python -m modnn.run your_data.csv consistent`
+
+Scalers, checkpoints, trained models, results and figures are written to `./modnn_output`
+(change with `"output_dir"`). The GPU is used when available, otherwise the CPU.
+
+## 🧩 Model presets
+Pick a ready-made setting with `preset` (any other override is applied on top):
+
+| preset | model | when to use |
+| --- | --- | --- |
+| `"consistent"` (recommended) | RNN envelope driven by (T_ambient - T_zone), sign-constrained | Control and what-if studies: more heat from outside, sun, occupants or HVAC always pushes the zone temperature the physical way |
+| `"accurate"` | first-generation LSTM envelope (as in 1.0.1) | Pure forecasting, when the lowest error matters most |
+| `"strict"` | monotone envelope with explicit conduction | When every response must keep its physical sign at every horizon, by construction |
+
+The same switches are available one by one:
+* `architecture`: `"v3"` (default) or `"v1"` (first-generation LSTM envelope)
+* `ext_input`: `"state"` feeds [T_zone, T_ambient] to the envelope module, `"delta"` feeds T_ambient - T_zone
+* `consistency`: `"none"`, `"partial"` or `"strict"` (needs `ext_mdl="RNN"`)
+
 ## 🧠 Update log
 # 🧠 [2.0.0] 2025 May 9
 To further improve physical consistency, 
@@ -62,6 +95,18 @@ Fix temperature unit conversion issue
 
 # 🧠 [3.0.7] 2025 Sept 15
 Fix step model zone module dimension issue
+
+# 🧠 [3.1.0] 2026 Sept 25
+Add model presets: "consistent", "accurate" and "strict"
+
+Envelope sign constraints now apply: they target the envelope RNN's actual parameters, and a failing constraint raises an error instead of being skipped silently
+
+New options: "architecture" (v1/v3), "ext_input" (state/delta) and "consistency" (none/partial/strict)
+
+Result files no longer contain a line break in their names (they can now be saved on Windows)
+
+Easier to use: `from modnn import get_config, Mod`, `python -m modnn.run your_data.csv`, outputs in `./modnn_output`
+(previously `../`), device defaults to "cuda" with CPU fallback, clear errors for a missing data file or column, scipy added to requirements
 
 ## 🧪 Requirements
 
