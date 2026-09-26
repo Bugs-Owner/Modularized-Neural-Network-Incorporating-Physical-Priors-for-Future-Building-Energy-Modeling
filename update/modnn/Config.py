@@ -65,12 +65,10 @@ def _envelops(**kwargs):
 
 # Ready-made model settings. Pass one to get_config(preset=...) or _args(preset=...); any other
 # override you pass is applied on top.
-#   "accurate"   first-generation architecture (LSTM envelope, v1): lowest forecast error, but the
-#                envelope is unconstrained, so responses to weather are not guaranteed physical
-#   "consistent" RNN envelope driven by (T_ambient - T_zone) with sign constraints: heat from outside,
-#                sun, occupants and HVAC always pushes zone temperature the physical way (recommended)
-#   "strict"     monotone model with explicit conduction: every response keeps its physical sign at
-#                every horizon, by construction, at some cost in accuracy
+#   "accurate"   1.0.1 design (LSTM envelope): best forecast accuracy, for forecasting
+#   "consistent" 3.0.0 design (RNN envelope on T_ambient - T_zone, sign-constrained): responses follow
+#                physics, for control, optimization and what-if studies
+#   "strict"     monotone envelope with explicit conduction: consistent by construction
 PRESETS = {
     "accurate":   {"architecture": "v1", "ext_mdl": "LSTM",
                    "para": {"Int_h": 18, "Ext_in": 5, "Ext_h": 22}},
@@ -178,20 +176,16 @@ def get_config(overrides=None, preset=None):
         overrides.setdefault("preset", preset)
     return _args(**overrides)
 
-# Short notes printed when a model is built, so users know what each setting does and does not guarantee
+# Short note printed when a model is built: which setting this is and what it is good for
 NOTES = {
-    "v1": ("ModNN v1 (preset 'accurate', as in release 1.0.1): typically the most accurate forecasts.\n"
-           "  Physically consistent for HVAC: heating always warms and cooling always cools the zone.\n"
-           "  NOT constrained for outdoor temperature, solar or occupancy: a what-if change to those inputs can move\n"
-           "  the forecast the wrong way. For control or what-if studies use preset='consistent'."),
-    "none": ("ModNN v3 with an unconstrained envelope (release 3.0.x default).\n"
-             "  Physically consistent for HVAC and internal gains; NOT for outdoor temperature or solar.\n"
-             "  Use preset='consistent' for consistent responses, or preset='accurate' for the lowest error."),
-    "partial": ("ModNN v3, preset 'consistent' (envelope as in release 3.0.0, with sign constraints).\n"
-                "  Heat from outside, sun, occupants and HVAC pushes the zone temperature the physical way.\n"
-                "  Recommended for control, optimisation and what-if studies; slightly less accurate than 'accurate'."),
-    "strict": ("ModNN v3, preset 'strict': every response keeps its physical sign at every horizon, by construction.\n"
-               "  Guaranteed consistency at some cost in accuracy; 'consistent' is usually the better trade-off."),
+    "v1": "ModNN 'accurate' (1.0.1 design): best forecast accuracy, HVAC responses follow physics.\n"
+          "  Good for: temperature and load forecasting.",
+    "none": "ModNN (default settings).\n"
+            "  Tip: preset='accurate' for forecasting, preset='consistent' for control and what-if studies.",
+    "partial": "ModNN 'consistent' (3.0.0 design): responses to weather, occupancy and HVAC follow physics.\n"
+               "  Good for: control, optimization and what-if studies.",
+    "strict": "ModNN 'strict': physically consistent by construction, at every forecast step.\n"
+              "  Good for: applications that require guaranteed physical consistency.",
 }
 
 
@@ -200,7 +194,7 @@ def describe(args):
     if args.get("envelop_mdl") == "physics":
         return "ModNN with the RC (physics) envelope."
     if args.get("modeltype") == "LSTM":
-        return "LSTM baseline: purely data-driven, no physical constraints."
+        return "LSTM baseline (purely data-driven)."
     if args.get("architecture", "v3") == "v1":
         return NOTES["v1"]
     return NOTES[args.get("consistency", "none")]

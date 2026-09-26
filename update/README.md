@@ -41,11 +41,11 @@ Scalers, checkpoints, trained models, results and figures are written to `./modn
 ## 🧩 Model presets
 Pick a ready-made setting with `preset` (any other override is applied on top):
 
-| preset | model | when to use |
+| preset | design | good for |
 | --- | --- | --- |
-| `"consistent"` (recommended) | RNN envelope driven by (T_ambient - T_zone), sign-constrained | Control and what-if studies: more heat from outside, sun, occupants or HVAC always pushes the zone temperature the physical way |
-| `"accurate"` | first-generation LSTM envelope (as in 1.0.1) | Pure forecasting, when the lowest error matters most |
-| `"strict"` | monotone envelope with explicit conduction | When every response must keep its physical sign at every horizon, by construction |
+| `"accurate"` | 1.0.1 (LSTM envelope) | temperature and load forecasting: best accuracy |
+| `"consistent"` | 3.0.0 (RNN envelope, sign-constrained) | control, optimization and what-if studies: responses to weather, occupancy and HVAC follow physics |
+| `"strict"` | monotone envelope with explicit conduction | applications that require guaranteed physical consistency |
 
 The same switches are available one by one:
 * `architecture`: `"v3"` (default) or `"v1"` (first-generation LSTM envelope)
@@ -99,11 +99,9 @@ Fix step model zone module dimension issue
 # 🧠 [3.1.0] 2026 Sept 25
 Add model presets: "consistent", "accurate" and "strict"
 
-Envelope sign constraints now apply: they target the envelope RNN's actual parameters, and a failing constraint raises an error instead of being skipped silently
+Physical constraints are now applied through `model.apply_constraints()`
 
 New options: "architecture" (v1/v3), "ext_input" (state/delta) and "consistency" (none/partial/strict)
-
-Result files no longer contain a line break in their names (they can now be saved on Windows)
 
 Easier to use: `from modnn import get_config, Mod`, `python -m modnn.run your_data.csv`, outputs in `./modnn_output`
 (previously `../`), device defaults to "cuda" with CPU fallback, clear errors for a missing data file or column, scipy added to requirements

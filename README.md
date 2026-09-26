@@ -52,13 +52,13 @@ model.test()
 Your CSV needs a datetime index and the columns `temp_room`, `temp_amb`, `solar`, `occ` and `phvac`
 (examples in `update/example_data`). The package source is in `update/`.
 
-**Which model to use?** Creating a model prints a short note on what it guarantees.
+**Which model to use?**
 
-| preset | use it for | physically consistent responses |
-| --- | --- | --- |
-| `"consistent"` (recommended) | control, optimisation, what-if studies | HVAC, internal gains, outdoor temperature and solar |
-| `"accurate"` (as in 1.0.1) | pure forecasting, lowest error | HVAC only |
-| `"strict"` | when consistency must be guaranteed by construction | all inputs, at every horizon |
+| preset | good for |
+| --- | --- |
+| `"accurate"` (1.0.1 design) | temperature and load forecasting: best accuracy |
+| `"consistent"` (3.0.0 design) | control, optimization and what-if studies: responses follow physics |
+| `"strict"` | applications that require guaranteed physical consistency |
 
 See `update/README.md` for details.
 
