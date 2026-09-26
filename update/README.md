@@ -25,32 +25,33 @@ Your CSV needs a datetime index and the columns `temp_room`, `temp_amb`, `solar`
 ```python
 from modnn import get_config, Mod
 
-args = get_config({"datapath": "your_data.csv"}, preset="consistent")
-model = Mod(args)        # prints a short note on what this setting guarantees
+args = get_config({"datapath": "your_data.csv"})
+model = Mod(args)
 model.data_ready()       # or model.data_ready(df) with a pandas DataFrame
 model.train()
 model.load()
 model.test()
 ```
 
-or from the command line: `python -m modnn.run your_data.csv consistent`
+or from the command line: `python -m modnn.run your_data.csv`
 
 Scalers, checkpoints, trained models, results and figures are written to `./modnn_output`
 (change with `"output_dir"`). The GPU is used when available, otherwise the CPU.
 
-## 🧩 Model presets
-Pick a ready-made setting with `preset` (any other override is applied on top):
-
-| preset | design | good for |
+## 🧩 Model options
+| option | values | meaning |
 | --- | --- | --- |
-| `"accurate"` | 1.0.1 (LSTM envelope) | temperature and load forecasting: best accuracy |
-| `"consistent"` | 3.0.0 (RNN envelope, sign-constrained) | control, optimization and what-if studies: responses to weather, occupancy and HVAC follow physics |
-| `"strict"` | monotone envelope with explicit conduction | applications that require guaranteed physical consistency |
+| `architecture` | `"v3"` (default), `"v1"` | `"v1"` is the first-generation model (LSTM envelope, as in 1.0.1) |
+| `ext_input` | `"state"` (default), `"delta"` | envelope module input: [T_zone, T_ambient] or T_ambient - T_zone (as in 3.0.0) |
+| `constraints` | any of `"hvac"`, `"internal"`, `"ambient"`, `"solar"` | inputs whose effect on zone temperature must follow physics (default `["hvac", "internal"]`) |
 
-The same switches are available one by one:
-* `architecture`: `"v3"` (default) or `"v1"` (first-generation LSTM envelope)
-* `ext_input`: `"state"` feeds [T_zone, T_ambient] to the envelope module, `"delta"` feeds T_ambient - T_zone
-* `consistency`: `"none"`, `"partial"` or `"strict"` (needs `ext_mdl="RNN"`)
+`"ambient"` and `"solar"` constrain the envelope module and need `architecture="v3"` with `ext_mdl="RNN"`.
+For example, a model whose responses to HVAC, occupancy, weather and sun all follow physics:
+
+```python
+args = get_config({"datapath": "your_data.csv", "ext_input": "delta",
+                   "constraints": ["hvac", "internal", "ambient", "solar"]})
+```
 
 ## 🧠 Update log
 # 🧠 [2.0.0] 2025 May 9
@@ -97,14 +98,15 @@ Fix temperature unit conversion issue
 Fix step model zone module dimension issue
 
 # 🧠 [3.1.0] 2026 Sept 25
-Add model presets: "consistent", "accurate" and "strict"
-
-Physical constraints are now applied through `model.apply_constraints()`
-
-New options: "architecture" (v1/v3), "ext_input" (state/delta) and "consistency" (none/partial/strict)
+New options: "architecture" (v1/v3) and "ext_input" (state/delta); physical constraints applied through `model.apply_constraints()`
 
 Easier to use: `from modnn import get_config, Mod`, `python -m modnn.run your_data.csv`, outputs in `./modnn_output`
 (previously `../`), device defaults to "cuda" with CPU fallback, clear errors for a missing data file or column, scipy added to requirements
+
+# 🧠 [3.2.0] 2026 Sept 25
+Choose which responses are physically constrained with `"constraints"`: any of "hvac", "internal", "ambient", "solar"
+
+Presets removed
 
 ## 🧪 Requirements
 

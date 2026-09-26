@@ -2,7 +2,7 @@
 ModNN, first-generation architecture (released as 1.0.1): LSTM envelope module that also sees the time of
 day, bounded internal-gain schedule, and an encoder that blends measured and predicted zone temperature to
 initialise the thermal state. Select it with args["architecture"] = "v1".
-The LSTM envelope cannot be sign-constrained, so only the zone and internal-gain scales are constrained.
+Constraints available: "hvac" and "internal".
 """
 import torch
 import torch.nn as nn
@@ -107,6 +107,10 @@ class ModNN(nn.Module):
         self.encoLen = args["enLen"]
         self.device = args['device']
         self.window = para["window"]
+        self.constraints = set(args.get("constraints", ["hvac", "internal"]))
+        if self.constraints - {"hvac", "internal"}:
+            raise ValueError("architecture 'v1' supports the constraints 'hvac' and 'internal'; "
+                             "use architecture 'v3' for 'ambient' or 'solar'")
 
         self.Ext = external(para["Ext_in"], para["Ext_h"], para["Ext_out"])
         self.Zone = zone(para["Zone_in"], para["Zone_out"])
@@ -117,8 +121,10 @@ class ModNN(nn.Module):
     def apply_constraints(self):
         """Hard physical constraints, applied after every optimizer step."""
         self.Zone.FC1.weight.clamp_(0)
-        self.HVAC.FC1.weight.clamp_(0)
-        self.Int.scale.weight.clamp_(0)
+        if "hvac" in self.constraints:
+            self.HVAC.FC1.weight.clamp_(0)
+        if "internal" in self.constraints:
+            self.Int.scale.weight.clamp_(0)
 
     def forward(self, input_X):
         """

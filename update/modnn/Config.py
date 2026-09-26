@@ -63,38 +63,13 @@ def _envelops(**kwargs):
     return envelop
 
 
-# Ready-made model settings. Pass one to get_config(preset=...) or _args(preset=...); any other
-# override you pass is applied on top.
-#   "accurate"   1.0.1 design (LSTM envelope): best forecast accuracy, for forecasting
-#   "consistent" 3.0.0 design (RNN envelope on T_ambient - T_zone, sign-constrained): responses follow
-#                physics, for control, optimization and what-if studies
-#   "strict"     monotone envelope with explicit conduction: consistent by construction
-PRESETS = {
-    "accurate":   {"architecture": "v1", "ext_mdl": "LSTM",
-                   "para": {"Int_h": 18, "Ext_in": 5, "Ext_h": 22}},
-    "consistent": {"architecture": "v3", "ext_mdl": "RNN", "ext_input": "delta", "consistency": "partial",
-                   "para": {"Int_h": 12, "Ext_h": 10}},
-    "strict":     {"architecture": "v3", "ext_mdl": "RNN", "ext_input": "state", "consistency": "strict",
-                   "para": {"Int_h": 8, "Ext_h": 16}},
-}
-# Training budget used by all presets
-PRESET_TRAINING = {"lr": 0.01, "epochs": 150, "patience": 25}
-
-
 def _args(**kwargs):
     """
     Returns model configurations.
     Allows keyword-based overrides.
     """
-    preset = kwargs.pop("preset", None)
     para_overrides = kwargs.pop("para", {})
     envelop_overrides = kwargs.pop("envelop", {})
-    if preset is not None:
-        if preset not in PRESETS:
-            raise ValueError("Unknown preset '{}', choose from {}".format(preset, list(PRESETS)))
-        chosen = {k: v for k, v in PRESETS[preset].items() if k != "para"}
-        kwargs = {**chosen, **kwargs}
-        para_overrides = {**PRESET_TRAINING, **PRESETS[preset]["para"], **para_overrides}
     args = {
         "para": _paras(**para_overrides),
         "envelop": _envelops(**envelop_overrides),
@@ -125,9 +100,8 @@ def _args(**kwargs):
                                   # "physics" rely on heatbalance equation, "datadriven" is a blackbox
         "architecture": "v3", # "v3": modular RNN envelope (default); "v1": first-generation LSTM envelope
         "ext_input": "state", # envelope input, "state": [T_zone, T_ambient]; "delta": T_ambient - T_zone
-        "consistency": "none", # physical consistency of the envelope module (needs ext_mdl="RNN"):
-                               # "none": unconstrained; "partial": envelope gain rises with ambient/solar and
-                               # falls with zone temperature; "strict": every response keeps its physical sign
+        "constraints": ["hvac", "internal"], # inputs that must move zone temperature the physical way:
+                               # "hvac", "internal", "ambient", "solar" ("ambient"/"solar" need ext_mdl="RNN")
         "ext_mdl": "RNN", # We provide LSTM and RNN module, for RNN, we can apply positive constraint easily
                            # But LSTM has Hadamard product, making this constraint hard to integrate
                            # However, disturbance variables always have similiar distribution, in other word, is this constraint really necessary?
@@ -154,7 +128,7 @@ def _args(**kwargs):
     return args
 
 
-def get_config(overrides=None, preset=None):
+def get_config(overrides=None):
     """
     Adjust parameters as needed.
 
@@ -167,37 +141,27 @@ def get_config(overrides=None, preset=None):
                 "device": "cuda",
                 ...
             }
-        preset (str): "accurate", "consistent" or "strict" (see PRESETS), or None for the defaults
     Returns:
         dict: Final configuration dictionary
     """
-    overrides = dict(overrides or {})
-    if preset is not None:
-        overrides.setdefault("preset", preset)
-    return _args(**overrides)
-
-# Short note printed when a model is built: which setting this is and what it is good for
-NOTES = {
-    "v1": "ModNN 'accurate' (1.0.1 design): best forecast accuracy, HVAC responses follow physics.\n"
-          "  Good for: temperature and load forecasting.",
-    "none": "ModNN (default settings).\n"
-            "  Tip: preset='accurate' for forecasting, preset='consistent' for control and what-if studies.",
-    "partial": "ModNN 'consistent' (3.0.0 design): responses to weather, occupancy and HVAC follow physics.\n"
-               "  Good for: control, optimization and what-if studies.",
-    "strict": "ModNN 'strict': physically consistent by construction, at every forecast step.\n"
-              "  Good for: applications that require guaranteed physical consistency.",
-}
+    return _args(**(overrides or {}))
 
 
 def describe(args):
-    """One-paragraph note on what the chosen configuration guarantees."""
+    """One-line summary of the model that will be built."""
     if args.get("envelop_mdl") == "physics":
-        return "ModNN with the RC (physics) envelope."
+        return "ModNN with the RC (physics) envelope"
     if args.get("modeltype") == "LSTM":
-        return "LSTM baseline (purely data-driven)."
-    if args.get("architecture", "v3") == "v1":
-        return NOTES["v1"]
-    return NOTES[args.get("consistency", "none")]
+        return "LSTM baseline"
+    arch = args.get("architecture", "v3")
+    parts = ["ModNN {}".format(arch)]
+    if arch != "v1":
+        parts.append("envelope input: {}".format(args.get("ext_input", "state")))
+    if "|C" in args.get("modeltype", "") or "LC" in args.get("modeltype", ""):
+        parts.append("constraints: off")
+    else:
+        parts.append("constraints: {}".format(", ".join(args.get("constraints", ["hvac", "internal"])) or "none"))
+    return " | ".join(parts)
 
 
 def print_help():
@@ -213,6 +177,11 @@ def print_help():
     print("  testday         (int)  : Number of test days")
     print("  training_batch  (int)  : Batch size for training")
     print("  plott           (str)  : 'all' to plot prediction results and checking results, 'others' to plot prediction results only")
+    print("  output_dir      (str)  : Folder for scalers, checkpoints, models, results and figures")
+    print("  architecture    (str)  : 'v3' (default) or 'v1' (first-generation LSTM envelope, as in 1.0.1)")
+    print("  ext_input       (str)  : Envelope input, 'state' [T_zone, T_ambient] or 'delta' (T_ambient - T_zone)")
+    print("  constraints     (list) : Inputs that must move zone temperature the physical way:")
+    print("                           'hvac', 'internal', 'ambient', 'solar' (default ['hvac', 'internal'])")
     print("  modeltype       (str)  : LSTM, PI-modnn, PI-modnn|C, PI-modnn|L, PI-modnn|LC where LSTM is the baseline, |C means no constraints, |L means no loss adjustment")
     print("  scale           (float): Scaling factor for HVAC power")
     print("\nHyperparameters (args['para']):")

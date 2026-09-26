@@ -42,7 +42,7 @@ pip install modnn
 ```python
 from modnn import get_config, Mod
 
-args = get_config({"datapath": "your_data.csv"}, preset="consistent")
+args = get_config({"datapath": "your_data.csv"})
 model = Mod(args)
 model.data_ready()
 model.train()
@@ -52,13 +52,8 @@ model.test()
 Your CSV needs a datetime index and the columns `temp_room`, `temp_amb`, `solar`, `occ` and `phvac`
 (examples in `update/example_data`). The package source is in `update/`.
 
-**Which model to use?**
-
-| preset | good for |
-| --- | --- |
-| `"accurate"` (1.0.1 design) | temperature and load forecasting: best accuracy |
-| `"consistent"` (3.0.0 design) | control, optimization and what-if studies: responses follow physics |
-| `"strict"` | applications that require guaranteed physical consistency |
+**Options:** `architecture` ("v3", or "v1" for the 1.0.1 model), `ext_input` ("state", or "delta" as in 3.0.0) and
+`constraints`, the inputs whose effect must follow physics: any of "hvac", "internal", "ambient", "solar".
 
 See `update/README.md` for details.
 

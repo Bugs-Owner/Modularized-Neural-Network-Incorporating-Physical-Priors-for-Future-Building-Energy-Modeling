@@ -142,7 +142,7 @@ def train_model(model, train_loader, valid_loader, test_loader, lr, epochs,
                     optimizer.step()
 
                     if Phy_cons==1:
-                        # Positive hard constraints (and envelope sign constraints, see args["consistency"])
+                        # Physical constraints chosen in args["constraints"]
                         model.apply_constraints()
                     time_elapsed = time.time() - time_start
                     total_time += time_elapsed
